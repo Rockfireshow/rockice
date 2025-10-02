@@ -58,3 +58,78 @@
 </body>
 </html>
 
+<!-- 表單 UI（可自行美化） -->
+<form id="orderForm" class="card" style="margin:20px; padding:16px; border:1px solid #e5e7eb; border-radius:12px;">
+  <h2 style="margin:0 0 12px;">訂購資料</h2>
+
+  <label>客戶/店家名稱<br><input name="customerName" required></label><br><br>
+  <label>外送地址<br><input name="address" required></label><br><br>
+  <label>電話/手機<br><input name="phone" required></label><br><br>
+
+  <label>訂購日期<br><input type="date" name="orderDate" required></label><br><br>
+  <label>開始時間<br><input type="time" name="startTime" required></label><br><br>
+  <label>結束時間<br><input type="time" name="endTime" required></label><br><br>
+
+  <label>訂購數量（整數）<br><input type="number" name="qty" min="1" required></label><br><br>
+  <label>備註<br><textarea name="note" rows="3"></textarea></label><br><br>
+
+  <button type="submit">送出</button>
+  <span id="submitMsg" style="margin-left:12px;"></span>
+</form>
+
+<script>
+  const LIFF_ID = "YOUR_LIFF_ID";
+  const GAS_ENDPOINT = "YOUR_GAS_WEBAPP_URL"; // 例如 https://script.google.com/macros/s/AKfycb.../exec
+
+  async function ensureLogin() {
+    if (!liff.isLoggedIn()) { liff.login(); return false; }
+    return true;
+  }
+
+  async function initLiff() {
+    await liff.init({ liffId: LIFF_ID }); // 每次開頁都要 init
+    const loggedIn = await ensureLogin();
+    return loggedIn;
+  }
+
+  document.getElementById("orderForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("submitMsg");
+    msg.textContent = "送出中…";
+
+    try {
+      // 確保 LIFF 初始化與登入；然後拿 ID Token
+      const ok = await initLiff(); if (!ok) return;
+      const idToken = liff.getIDToken(); // 需 openid scope
+      if (!idToken) throw new Error("取不到 id_token，請用 LIFF URL 開啟並登入");
+
+      // 收集欄位
+      const fd = new FormData(e.target);
+      const p = new URLSearchParams();
+      p.set("id_token", idToken);
+      p.set("customerName", fd.get("customerName") || "");
+      p.set("address",      fd.get("address") || "");
+      p.set("phone",        fd.get("phone") || "");
+      p.set("orderDate",    fd.get("orderDate") || "");
+      p.set("startTime",    fd.get("startTime") || "");
+      p.set("endTime",      fd.get("endTime") || "");
+      p.set("qty",          fd.get("qty") || "");
+      p.set("note",         fd.get("note") || "");
+
+      // 用 x-www-form-urlencoded 送出（屬於「simple request」，可避免多餘的 CORS preflight）
+      const res = await fetch(GAS_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: p.toString()
+      });
+
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.message || "送出失敗");
+      msg.textContent = "已送出 ✅（訂單編號：" + json.orderId + "）";
+      e.target.reset();
+    } catch (err) {
+      console.error(err);
+      msg.textContent = "❌ " + (err?.message || err);
+    }
+  });
+</script>
