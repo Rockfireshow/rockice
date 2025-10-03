@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>LIFF Minimal + 訂單表單</title>
   <style>
-    :root { --bd:#e5e7eb; --bg:#f9fafb; }
+    :root { --bd:#e5e7eb; }
     body { font-family: system-ui, -apple-system, "Noto Sans TC", Arial; margin: 0; background: #fff; }
     .wrap { max-width: 960px; margin: 0 auto; padding: 24px; }
     h1 { font-size: 28px; margin: 0 0 16px; }
@@ -15,16 +15,22 @@
     .pill { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     label { display:block; font-size:14px; color:#111827; }
-    input, textarea, select { width: 100%; box-sizing: border-box; padding: 10px 12px; border:1px solid var(--bd); border-radius: 10px; background:#fff; }
+    input, textarea, select { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--bd); border-radius:10px; background:#fff; }
     textarea { resize: vertical; }
-    button { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--bd); cursor: pointer; background:#fff; }
+    /* iOS/Safari：確保按鈕文字可見，移除預設外觀 */
+    .btn, input[type="submit"], input[type="reset"], button {
+      color:#111827 !important; background:#fff; border:1px solid var(--bd);
+      font-size:16px; line-height:1.2; border-radius:10px; padding:10px 14px;
+      -webkit-appearance:none; appearance:none; cursor:pointer;
+    }
+    .btn:disabled { opacity:.6; cursor:not-allowed; }
     .actions { display:flex; gap:10px; align-items:center; }
     .muted { color:#6b7280; font-size:13px; }
     .ok { color:#0f5132; }
     .err { color:#b42318; }
     .mt { margin-top: 20px; }
   </style>
-  <!-- LIFF SDK（官方） -->
+  <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
@@ -37,16 +43,15 @@
       <div class="row">顯示名稱：<span id="displayName">—</span></div>
       <div class="row">使用者 ID：<span id="userId" class="pill">—</span></div>
       <div class="row actions">
-        <button id="refreshBtn" type="button">重新取得 Profile</button>
-        <button id="logoutBtn" type="button">登出</button>
+        <input id="refreshBtn" type="button" value="重新取得 Profile" class="btn" />
+        <input id="logoutBtn"  type="button" value="登出" class="btn" />
         <span class="muted">請務必以 <b>LIFF URL</b> 開啟本頁，才會有 ID Token</span>
       </div>
     </div>
 
-    <!-- 訂單表單 -->
+    <!-- 訂單表單（與你的試算表表頭對齊：customerName → address → phone → orderDate → startTime → endTime → qty → note） -->
     <form id="orderForm" class="card mt" autocomplete="on">
       <h2>訂購資料</h2>
-
       <div class="grid">
         <div>
           <label>客戶/店家名稱
@@ -58,7 +63,6 @@
             <input name="address" required placeholder="台北市○○區○○路 1 號">
           </label>
         </div>
-
         <div>
           <label>電話/手機
             <input name="phone" required inputmode="tel" placeholder="0912-345-678">
@@ -69,7 +73,6 @@
             <input type="date" name="orderDate" required>
           </label>
         </div>
-
         <div>
           <label>開始時間
             <input type="time" name="startTime" required>
@@ -80,7 +83,6 @@
             <input type="time" name="endTime" required>
           </label>
         </div>
-
         <div>
           <label>訂購數量（整數）
             <input type="number" name="qty" min="1" step="1" required placeholder="例如 2">
@@ -92,117 +94,91 @@
           </label>
         </div>
       </div>
-
       <div class="actions mt">
-        <button id="submitBtn" type="submit">送出</button>
-        <button id="resetBtn" type="reset">清空</button>
+        <input id="submitBtn" type="submit" value="送出" class="btn">
+        <input id="resetBtn"  type="reset"  value="清空" class="btn">
         <span id="submitMsg" class="muted"></span>
       </div>
     </form>
   </div>
 
   <script>
-    // ★★★ 把這個換成你的 LIFF ID ★★★
+    // ★ 把這個換成你的 LIFF ID
     const LIFF_ID = "2008199393-AMqeEVBY";
+    // ★ 你的 GAS Web App（exec）
+    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbz-_jyBZsBV7EZxnr29cfy8OiAuxcDHnwHNPZbpsTCHK458ZVBaOQUFCuctrxM9Gtqd/exec";
 
-    // 你的 GAS Web App（exec）URL —— 已換成你提供的連結
-    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbzdjuiIDBWkEKlUwCs6V1ufBM64Qsq0xQ0AlCtjJmut-OkGLKiIrGsWqvcx3Yo_wsTP/exec";
+    const $ = (s) => document.querySelector(s);
+    const byName = (n) => document.querySelector(`[name="${n}"]`);
 
-    // ---- 小工具 ----
-    const $ = (sel) => document.querySelector(sel);
-    const byName = (name) => document.querySelector(`[name="${name}"]`);
-
-    // 以網址 ?key=value 預填表單（例如 ?customerName=林小姐&qty=2）
+    // 用網址 ?key=value 預填（如 ?customerName=林小姐&qty=2）
     function prefillFromQuery() {
       const q = new URLSearchParams(location.search);
-      const keys = ["customerName","address","phone","orderDate","startTime","endTime","qty","note"];
-      keys.forEach(k => { const v = q.get(k); if (v !== null) byName(k).value = decodeURIComponent(v); });
+      ["customerName","address","phone","orderDate","startTime","endTime","qty","note"]
+        .forEach(k => { const v = q.get(k); if (v !== null) byName(k).value = decodeURIComponent(v); });
     }
 
     async function ensureLogin() {
-      if (!liff.isLoggedIn()) {
-        liff.login();
-        return false; // login 後會回來本頁
-      }
+      if (!liff.isLoggedIn()) { liff.login(); return false; }
       return true;
     }
 
     async function loadProfile() {
       try {
-        const profile = await liff.getProfile();
-        $("#displayName").textContent = profile.displayName || "（未知）";
-        $("#userId").textContent = profile.userId || "（未知）";
-      } catch (e) {
-        console.warn("getProfile 失敗", e);
-      }
+        const p = await liff.getProfile();
+        $("#displayName").textContent = p.displayName || "—";
+        $("#userId").textContent      = p.userId || "—";
+      } catch (e) { console.warn("getProfile 失敗", e); }
     }
 
     async function initLiff() {
       $("#status").textContent = "呼叫 liff.init()…";
-      await liff.init({ liffId: LIFF_ID }); // 每次開頁都要 init
-      const ok = await ensureLogin();
-      if (!ok) return false;
-
+      await liff.init({ liffId: LIFF_ID });                         // 每次開頁都要 init
+      const ok = await ensureLogin(); if (!ok) return false;        // 確保登入
       $("#status").textContent = liff.isInClient() ? "已在 LINE 內開啟" : "外部瀏覽器開啟";
       await loadProfile();
       return true;
     }
 
-    // 表單送出
+    // 送單
     $("#orderForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const submitBtn = $("#submitBtn");
       const msg = $("#submitMsg");
-      msg.className = "muted"; msg.textContent = "送出中…";
-      submitBtn.disabled = true;
+      const btn = $("#submitBtn");
+      msg.className = "muted"; msg.textContent = "送出中…"; btn.disabled = true;
 
       try {
-        // 確保 LIFF 初始化與登入
-        const inited = await initLiff();
-        if (!inited) return;
-
-        const idToken = liff.getIDToken(); // 需 openid scope
+        const inited = await initLiff(); if (!inited) return;
+        const idToken = liff.getIDToken();                          // 需 openid scope
         if (!idToken) throw new Error("取不到 id_token：請以 LIFF URL 開啟並登入（Login scope 至少包含 openid）");
 
-        // 收集欄位 → x-www-form-urlencoded（simple request，最穩）
         const fd = new FormData(e.target);
         const p = new URLSearchParams();
         p.set("id_token", idToken);
         ["customerName","address","phone","orderDate","startTime","endTime","qty","note"]
           .forEach(k => p.set(k, (fd.get(k) || "").toString().trim()));
 
-        // 發送
-        const res = await fetch(GAS_ENDPOINT, {
+        const res  = await fetch(GAS_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
           body: p.toString()
         });
+        let json = {}; try { json = await res.json(); } catch {}
+        if (!res.ok || !json.ok) throw new Error(json.message || `HTTP ${res.status}`);
 
-        // 處理回應
-        let json = {};
-        try { json = await res.json(); } catch { /* 若不是 JSON 也避免爆 */ }
-
-        if (!res.ok || !json.ok) {
-          const m = (json && json.message) ? json.message : `HTTP ${res.status}`;
-          throw new Error(m);
-        }
-
-        msg.className = "ok"; 
-        msg.textContent = `已送出 ✅ 訂單編號：${json.orderId}`;
+        msg.className = "ok"; msg.textContent = `已送出 ✅ 訂單編號：${json.orderId}`;
         e.target.reset();
       } catch (err) {
         console.error(err);
-        msg.className = "err";
-        msg.textContent = "❌ " + (err?.message || err);
+        msg.className = "err"; msg.textContent = "❌ " + (err?.message || err);
       } finally {
-        submitBtn.disabled = false;
+        btn.disabled = false;
       }
     });
 
     $("#refreshBtn").addEventListener("click", loadProfile);
     $("#logoutBtn").addEventListener("click", () => { if (liff.isLoggedIn()) { liff.logout(); location.reload(); }});
 
-    // 頁面進來就先做基本初始化（顯示狀態 & 預填參數）
     prefillFromQuery();
     (async () => { try { await initLiff(); } catch (e) { console.error(e); }})();
   </script>
