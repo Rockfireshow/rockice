@@ -11,8 +11,6 @@
     h1 { font-size: 28px; margin: 0 0 16px; }
     h2 { font-size: 20px; margin: 0 0 12px; }
     .card { border: 1px solid var(--bd); border-radius: 14px; padding: 16px; background: #fff; }
-    .row { margin: 8px 0; }
-    .pill { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     label { display:block; font-size:14px; color:#111827; }
     input, textarea { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--bd); border-radius:10px; background:#fff; }
@@ -45,6 +43,9 @@
       -webkit-appearance:none; appearance:none; cursor:pointer;
     }
     .btn:disabled { opacity:.6; cursor:not-allowed; }
+
+    /* 讓狀態卡片預設隱藏；加上 ?debug=1 會顯示 */
+    .debug-hidden { display:none; }
   </style>
   <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -59,11 +60,11 @@
 
     <h1>LIFF Minimal</h1>
 
-    <!-- 狀態卡片 -->
-    <div class="card">
+    <!-- 狀態卡片（預設隱藏，?debug=1 時顯示） -->
+    <div id="debugCard" class="card debug-hidden">
       <div class="row">狀態：<span id="status">初始化中…</span></div>
       <div class="row">顯示名稱：<span id="displayName">—</span></div>
-      <div class="row">使用者 ID：<span id="userId" class="pill">—</span></div>
+      <div class="row">使用者 ID：<span id="userId" class="muted">—</span></div>
       <div class="row actions">
         <input id="refreshBtn" type="button" value="重新取得 Profile" class="btn" />
         <input id="logoutBtn"  type="button" value="登出" class="btn" />
@@ -77,12 +78,12 @@
       <div class="grid">
         <div>
           <label>客戶/店家名稱
-            <input name="customerName" required placeholder="張三火鍋/小林飲料店">
+            <input name="customerName" required placeholder="阿綸熱炒/小林飲料店">
           </label>
         </div>
         <div>
           <label>外送地址
-            <input name="address" required placeholder="台北市○○區○○路 1 號">
+            <input name="address" required placeholder="新北市三重區○○路 1 號">
           </label>
         </div>
         <div>
@@ -95,8 +96,6 @@
             <input type="date" name="orderDate" required>
           </label>
         </div>
-
-        <!-- 希望/最晚送達時間（name 維持 startTime/endTime） -->
         <div>
           <label>希望送達時間
             <input type="time" name="startTime" required min="08:00" max="17:00" step="60" placeholder="08:00">
@@ -109,7 +108,6 @@
             <small class="help">需與希望送達時間同在 <b>08:00–17:00</b>，且必須晚於希望送達時間</small>
           </label>
         </div>
-
         <div>
           <label>訂購數量（整數）
             <input type="number" name="qty" min="1" step="1" required placeholder="例如 2">
@@ -117,7 +115,7 @@
         </div>
         <div>
           <label>備註
-            <textarea name="note" rows="3" placeholder="送達時間區間、冰塊規格、上樓需求等"></textarea>
+            <textarea name="note" rows="3" ></textarea>
           </label>
         </div>
       </div>
@@ -134,7 +132,7 @@
 
   <script>
     // ===== 你的 LIFF 與後端設定 =====
-    const LIFF_ID = "2008199393-AMqeEVBY"; // 已替你寫入
+    const LIFF_ID = "2008199393-AMqeEVBY"; // 你的 LIFF ID（已寫入）
     const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbyclYM-2pflurusfn5NuwGv2farNzrFUpdXR3u3t58_cUOXRx-7lMQ5EFMjcWL7SHGC/exec";
 
     // ===== 外送可下單時間（分鐘） =====
@@ -144,28 +142,69 @@
     const $ = (s) => document.querySelector(s);
     const byName = (n) => document.querySelector(`[name="${n}"]`);
 
+    // 預設隱藏的狀態卡：?debug=1 時顯示
+    const SHOW_DEBUG = new URL(location.href).searchParams.has("debug");
+    if (SHOW_DEBUG) $("#debugCard").classList.remove("debug-hidden");
+
     // 顯示頂部外送時間
     function fmt(min){ const h=String(Math.floor(min/60)).padStart(2,"0"); const m=String(min%60).padStart(2,"0"); return `${h}:${m}`;}
     $("#deliverWindow").textContent = `${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)}`;
 
-    // 用網址 ?key=value 預填
+    // 用網址 ?key=value 預填（你之前就有的）
     function prefillFromQuery() {
       const q = new URLSearchParams(location.search);
       ["customerName","address","phone","orderDate","startTime","endTime","qty","note"]
         .forEach(k => { const v = q.get(k); if (v !== null) byName(k).value = decodeURIComponent(v); });
     }
 
-    // LIFF 登入/初始化
+    // ====== 本地記住顧客資料（依 userId） ======
+    const STORE_VER = "v1";
+    function keyFor(uid){ return `liff:defaults:${STORE_VER}:${uid}`; }
+
+    function loadDefaults(uid){
+      try{
+        const s = localStorage.getItem(keyFor(uid));  // localStorage：跨分頁持久化 :contentReference[oaicite:2]{index=2}
+        if(!s) return;
+        const data = JSON.parse(s);
+        if (data.customerName && !byName("customerName").value) byName("customerName").value = data.customerName;
+        if (data.address && !byName("address").value)          byName("address").value       = data.address;
+        if (data.phone && !byName("phone").value)              byName("phone").value         = data.phone;
+      }catch(e){ console.warn("loadDefaults failed", e); }
+    }
+    function saveDefaults(uid){
+      try{
+        const data = {
+          customerName: byName("customerName").value.trim(),
+          address:      byName("address").value.trim(),
+          phone:        byName("phone").value.trim(),
+        };
+        localStorage.setItem(keyFor(uid), JSON.stringify(data)); // setItem 會新增或更新值 :contentReference[oaicite:3]{index=3}
+      }catch(e){ console.warn("saveDefaults failed", e); }
+    }
+    // 也提供清除功能（按住 Shift 點「清空」就會清記錄）
+    $("#resetBtn").addEventListener("click", (ev)=>{
+      if (ev.shiftKey && window.__USER_ID__) {
+        localStorage.removeItem(keyFor(window.__USER_ID__));
+        alert("已清除此使用者的記住資料");
+      }
+    });
+
+    // ===== LIFF 登入/初始化 =====
     async function ensureLogin() { if (!liff.isLoggedIn()) { liff.login(); return false; } return true; }
     async function loadProfile() {
-      try { const p = await liff.getProfile(); $("#displayName").textContent = p.displayName || "—"; $("#userId").textContent = p.userId || "—"; }
-      catch (e) { console.warn("getProfile 失敗", e); }
+      try {
+        const p = await liff.getProfile(); // 取得 userId（前端識別用途） :contentReference[oaicite:4]{index=4}
+        $("#displayName").textContent = p.displayName || "—";
+        $("#userId").textContent = p.userId || "—";
+        window.__USER_ID__ = p.userId || "";
+        if (window.__USER_ID__) loadDefaults(window.__USER_ID__); // 依 userId 帶入記住資料
+      } catch (e) { console.warn("getProfile 失敗", e); }
     }
     async function initLiff() {
-      $("#status").textContent = "呼叫 liff.init()…";
+      $("#status") && ($("#status").textContent = "呼叫 liff.init()…");
       await liff.init({ liffId: LIFF_ID });
       const ok = await ensureLogin(); if (!ok) return false;
-      $("#status").textContent = liff.isInClient() ? "已在 LINE 內開啟" : "外部瀏覽器開啟";
+      $("#status") && ($("#status").textContent = liff.isInClient() ? "已在 LINE 內開啟" : "外部瀏覽器開啟");
       await loadProfile();
       return true;
     }
@@ -174,13 +213,7 @@
     const startEl = byName('startTime'); // 希望送達時間
     const endEl   = byName('endTime');   // 最晚送達時間
     const timeErr = $("#timeErr");
-
-    // 再保險設一次 min/max/step（部分瀏覽器會吃不到 HTML 屬性）
-    [startEl, endEl].forEach(el => {
-      el.min  = fmt(OPEN_MIN);
-      el.max  = fmt(CLOSE_MIN);
-      el.step = 60; // 每 1 分鐘；若想完全不限制，拿掉這行即可
-    });
+    [startEl, endEl].forEach(el => { el.min = fmt(OPEN_MIN); el.max = fmt(CLOSE_MIN); el.step = 60; });
 
     function toMin(t){ if(!t||!/^\d{2}:\d{2}$/.test(t))return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
     function validateTimes(show=true){
@@ -197,6 +230,11 @@
     startEl.addEventListener("input", ()=>validateTimes(true));
     endEl  .addEventListener("input", ()=>validateTimes(true));
 
+    // 任何時候修改三欄，就即時存檔（有 userId 時）
+    ["customerName","address","phone"].forEach(n=>{
+      byName(n).addEventListener("change", ()=>{ if(window.__USER_ID__) saveDefaults(window.__USER_ID__); });
+    });
+
     // 送單
     $("#orderForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -206,43 +244,4 @@
       if (!validateTimes(true)) { msg.className = "err"; msg.textContent = "❌ 時間不在 08:00–17:00 或最晚未晚於希望"; btn.disabled=false; return; }
 
       try {
-        const inited = await initLiff(); if (!inited) return;
-        const idToken = liff.getIDToken(); if (!idToken) throw new Error("取不到 id_token：請以 LIFF URL 開啟並登入");
-
-        const fd = new FormData(e.target);
-        const p = new URLSearchParams();
-        p.set("id_token", idToken);
-        ["customerName","address","phone","orderDate","startTime","endTime","qty","note"]
-          .forEach(k => p.set(k, (fd.get(k) || "").toString().trim()));
-
-        const res = await fetch(GAS_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-          body: p.toString()
-        });
-        let json={}; try{ json=await res.json(); }catch{}
-        if(!res.ok || !json.ok) throw new Error(json.message || `HTTP ${res.status}`);
-
-        msg.className = "ok"; msg.textContent = `已送出 ✅ 訂單編號：${json.orderId}`;
-        e.target.reset(); validateTimes(true);
-      } catch (err) {
-        console.error(err);
-        msg.className = "err"; msg.textContent = "❌ " + (err?.message || err);
-      } finally {
-        btn.disabled = false;
-      }
-    });
-
-    $("#refreshBtn").addEventListener("click", loadProfile);
-    $("#logoutBtn").addEventListener("click", () => { if (liff.isLoggedIn()) { liff.logout(); location.reload(); }});
-
-    // 初始化
-    (function init(){
-      prefillFromQuery();
-      validateTimes(true);
-      initLiff().catch(console.error);
-    })();
-  </script>
-</body>
-</html>
-
+        const
