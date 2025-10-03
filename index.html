@@ -41,9 +41,7 @@
       -webkit-appearance:none; appearance:none; cursor:pointer;
     }
     .btn:disabled { opacity:.6; cursor:not-allowed; }
-
-    /* 狀態卡預設隱藏；?debug=1 顯示 */
-    .debug-hidden { display:none; }
+    .debug-hidden { display:none; } /* 狀態卡預設隱藏；?debug=1 顯示 */
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -89,6 +87,7 @@
         <div>
           <label>訂購日期
             <input type="date" name="orderDate" required>
+            <small class="help">不可選擇過去日期（系統自動帶入今天為最小值）</small>
           </label>
         </div>
         <div>
@@ -110,11 +109,12 @@
         </div>
         <div>
           <label>備註
-            <textarea name="note" rows="3" ></textarea>
+            <textarea name="note" rows="3"></textarea>
           </label>
         </div>
       </div>
 
+      <div id="dateErr" class="error" style="display:none" aria-live="polite"></div>
       <div id="timeErr" class="error" style="display:none" aria-live="polite"></div>
 
       <div class="actions mt">
@@ -188,7 +188,7 @@
       try{
         $("#status") && ($("#status").textContent="呼叫 liff.init()…");
         await liff.init({ liffId: LIFF_ID });
-        if(!liff.isLoggedIn()){ liff.login(); return; } // 會重導，後續中斷
+        if(!liff.isLoggedIn()){ liff.login(); return; } // 會重導
         $("#status") && ($("#status").textContent = liff.isInClient()? "已在 LINE 內開啟":"外部瀏覽器開啟");
         const p = await liff.getProfile();
         $("#displayName") && ($("#displayName").textContent = p.displayName || "—");
@@ -221,7 +221,35 @@
     startEl.addEventListener("input", ()=>validateTimes(true));
     endEl  .addEventListener("input", ()=>validateTimes(true));
 
-    // 三欄即時存檔
+    // ===== 訂購日期：最小值=今天 + 驗證（不可過去） =====
+    const orderDateEl = byName("orderDate");
+    const dateErr = $("#dateErr");
+    function todayISO(){
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,"0");
+      const da = String(d.getDate()).padStart(2,"0");
+      return `${y}-${m}-${da}`;
+    }
+    function enforceDateMin(){
+      const today = todayISO();
+      orderDateEl.min = today;       // HTML 原生限制：小於 min 視為 invalid（搭配 type=date） ①
+      if (!orderDateEl.value || orderDateEl.value < today) {
+        orderDateEl.value = today;   // 初次載入或外部預填舊日期時，自動拉回今天
+      }
+    }
+    function validateDate(show=true){
+      const today = orderDateEl.min || todayISO();
+      const v = orderDateEl.value;
+      let err = "";
+      if(!v){ err = "請選擇訂購日期"; }
+      else if(v < today){ err = "訂購日期不可早於今天"; }
+      if(show){ dateErr.style.display = err ? "block":"none"; dateErr.textContent = err; }
+      return !err;
+    }
+    orderDateEl.addEventListener("change", ()=>validateDate(true));
+
+    // ===== 三欄即時存檔 =====
     ["customerName","address","phone"].forEach(n=>{
       byName(n).addEventListener("change",()=>{ if(window.__USER_ID__) saveDefaults(window.__USER_ID__); });
     });
@@ -232,21 +260,16 @@
       const btn=$("#submitBtn"); const msg=$("#submitMsg");
       msg.className="muted"; msg.textContent="送出中…"; btn.disabled=true;
 
-      // 先做本地驗證
+      // 本地驗證
+      enforceDateMin();
+      if(!validateDate(true)){ msg.className="err"; msg.textContent="❌ 訂購日期不可早於今天"; btn.disabled=false; return; }
       if(!validateTimes(true)){ msg.className="err"; msg.textContent="❌ 時間不在 08:00–17:00 或最晚未晚於希望"; btn.disabled=false; return; }
 
-      // 確認 LIFF 狀態（不再重新 init；若尚未準備好，提示錯誤並復原）
-      if(!LIFF_READY){
-        msg.className="err"; msg.textContent="❌ LIFF 尚未就緒，請重新開啟此 LIFF 連結"; btn.disabled=false; return;
-      }
-      if(!liff.isLoggedIn()){
-        msg.className="err"; msg.textContent="❌ 尚未登入，請以 LIFF URL 登入後再送出"; btn.disabled=false; return;
-      }
+      if(!LIFF_READY){ msg.className="err"; msg.textContent="❌ LIFF 尚未就緒，請重新開啟此 LIFF 連結"; btn.disabled=false; return; }
+      if(!liff.isLoggedIn()){ msg.className="err"; msg.textContent="❌ 尚未登入，請以 LIFF URL 登入後再送出"; btn.disabled=false; return; }
 
       const idToken = liff.getIDToken();
-      if(!idToken){
-        msg.className="err"; msg.textContent="❌ 取不到 ID Token，請以 LIFF URL 開啟並登入"; btn.disabled=false; return;
-      }
+      if(!idToken){ msg.className="err"; msg.textContent="❌ 取不到 ID Token，請以 LIFF URL 開啟並登入"; btn.disabled=false; return; }
 
       try{
         const fd=new FormData(e.target);
@@ -267,7 +290,10 @@
         if(window.__USER_ID__) saveDefaults(window.__USER_ID__);
 
         msg.className="ok"; msg.textContent=`已送出 ✅ 訂單編號：${json.orderId}`;
-        e.target.reset(); validateTimes(true);
+        e.target.reset();
+        enforceDateMin(); // 送出後重置「今天」
+        validateTimes(true);
+        validateDate(true);
       }catch(err){
         console.error(err);
         msg.className="err"; msg.textContent="❌ "+(err?.message||err);
@@ -279,6 +305,8 @@
     // 啟動
     (async function(){
       prefillFromQuery();
+      enforceDateMin();   // 先設定今天為最小
+      validateDate(true);
       validateTimes(true);
       await initLiffOnce();
     })();
