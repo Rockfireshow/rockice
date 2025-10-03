@@ -15,7 +15,7 @@
     .pill { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     label { display:block; font-size:14px; color:#111827; }
-    input, textarea, select { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--bd); border-radius:10px; background:#fff; }
+    input, textarea { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--bd); border-radius:10px; background:#fff; }
     textarea { resize: vertical; }
     .help { color:#6b7280; font-size:12px; display:block; margin-top:4px; }
     .error { color:#b42318; font-size:13px; margin-top:8px; }
@@ -54,7 +54,7 @@
     <!-- 訂單可外送時間公告 -->
     <div class="notice">
       <b>訂單可外送時間：</b><span id="deliverWindow">08:00–17:00</span>
-      <span class="muted">（請在此區間內選擇，希望送達時間需早於最晚送達時間；每 15 分鐘一檔）</span>
+      <span class="muted">（請在此區間內選擇；<b>希望送達</b>需早於<b>最晚送達</b>）</span>
     </div>
 
     <h1>LIFF Minimal</h1>
@@ -96,16 +96,16 @@
           </label>
         </div>
 
-        <!-- 這兩個欄位只改顯示名稱，name 仍為 startTime / endTime -->
+        <!-- 希望/最晚送達時間（name 維持 startTime/endTime） -->
         <div>
           <label>希望送達時間
-            <input type="time" name="startTime" required min="08:00" max="17:00" step="900" placeholder="08:00">
-            <small class="help">請選擇 <b>08:00–17:00</b> </small>
+            <input type="time" name="startTime" required min="08:00" max="17:00" step="60" placeholder="08:00">
+            <small class="help">請選擇 <b>08:00–17:00</b> 之間的時間</small>
           </label>
         </div>
         <div>
           <label>最晚送達時間
-            <input type="time" name="endTime" required min="08:00" max="17:00" step="900" placeholder="17:00">
+            <input type="time" name="endTime" required min="08:00" max="17:00" step="60" placeholder="17:00">
             <small class="help">需與希望送達時間同在 <b>08:00–17:00</b>，且必須晚於希望送達時間</small>
           </label>
         </div>
@@ -133,15 +133,13 @@
   </div>
 
   <script>
-    // ★ 把這個換成你的 LIFF ID（Login scope 需含 openid）
-    const LIFF_ID = "2008199393-AMqeEVBY";
-    // ★ 你的 GAS Web App（exec）
+    // ===== 你的 LIFF 與後端設定 =====
+    const LIFF_ID = "2008199393-AMqeEVBY"; // 已替你寫入
     const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbxr80Yabq7v-CbIx0DTJ4Y9S0WxOVDFM9FPYV6vqWrCWLn37FwSZk3w1gd-_D4JP58-/exec";
 
     // ===== 外送可下單時間（分鐘） =====
     const OPEN_MIN  = 8 * 60;   // 08:00
     const CLOSE_MIN = 17 * 60;  // 17:00
-    const TIME_STEP = 15;       // 分鐘
 
     const $ = (s) => document.querySelector(s);
     const byName = (n) => document.querySelector(`[name="${n}"]`);
@@ -176,7 +174,13 @@
     const startEl = byName('startTime'); // 希望送達時間
     const endEl   = byName('endTime');   // 最晚送達時間
     const timeErr = $("#timeErr");
-    [startEl, endEl].forEach(el => { el.min = fmt(OPEN_MIN); el.max = fmt(CLOSE_MIN); el.step = TIME_STEP * 60; });
+
+    // 再保險設一次 min/max/step（部分瀏覽器會吃不到 HTML 屬性）
+    [startEl, endEl].forEach(el => {
+      el.min  = fmt(OPEN_MIN);
+      el.max  = fmt(CLOSE_MIN);
+      el.step = 60; // 每 1 分鐘；若想完全不限制，拿掉這行即可
+    });
 
     function toMin(t){ if(!t||!/^\d{2}:\d{2}$/.test(t))return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
     function validateTimes(show=true){
