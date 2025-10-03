@@ -17,9 +17,13 @@
     label { display:block; font-size:14px; color:#111827; }
     input, textarea, select { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--bd); border-radius:10px; background:#fff; }
     textarea { resize: vertical; }
-    /* iOS/Safari：確保按鈕文字可見，移除預設外觀 */
+
+    /* iOS / Safari：確保按鈕文字可見，移除預設外觀 */
     .btn, input[type="submit"], input[type="reset"], button {
-      color:#111827 !important; background:#fff; border:1px solid var(--bd);
+      color:#111827 !important;
+      -webkit-text-fill-color:#111827 !important;
+      background:#fff;
+      border:1px solid var(--bd);
       font-size:16px; line-height:1.2; border-radius:10px; padding:10px 14px;
       -webkit-appearance:none; appearance:none; cursor:pointer;
     }
@@ -49,7 +53,7 @@
       </div>
     </div>
 
-    <!-- 訂單表單（與你的試算表表頭對齊：customerName → address → phone → orderDate → startTime → endTime → qty → note） -->
+    <!-- 訂單表單（欄位順序與你的試算表表頭一一對齊） -->
     <form id="orderForm" class="card mt" autocomplete="on">
       <h2>訂購資料</h2>
       <div class="grid">
@@ -60,7 +64,7 @@
         </div>
         <div>
           <label>外送地址
-            <input name="address" required placeholder="台北市○○區○○路 1 號">
+            <input name="address" required placeholder="三重區○○路 1 號">
           </label>
         </div>
         <div>
@@ -90,7 +94,7 @@
         </div>
         <div>
           <label>備註
-            <textarea name="note" rows="3" placeholder="送達時間區間、冰塊規格、上樓需求等"></textarea>
+            <textarea name="note" rows="3" ></textarea>
           </label>
         </div>
       </div>
@@ -103,10 +107,10 @@
   </div>
 
   <script>
-    // ★ 把這個換成你的 LIFF ID
+    // ★ 把這個換成你的 LIFF ID（需含 openid scope，才能拿到 id_token）
     const LIFF_ID = "2008199393-AMqeEVBY";
     // ★ 你的 GAS Web App（exec）
-    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbz-_jyBZsBV7EZxnr29cfy8OiAuxcDHnwHNPZbpsTCHK458ZVBaOQUFCuctrxM9Gtqd/exec";
+    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbzOnEFXY2GND553uppqGvrApa6dmsGJiOcpXbXDdIK9X-czAKGSk9nw4LUga6A7t9As/exec";
 
     const $ = (s) => document.querySelector(s);
     const byName = (n) => document.querySelector(`[name="${n}"]`);
@@ -150,8 +154,9 @@
       try {
         const inited = await initLiff(); if (!inited) return;
         const idToken = liff.getIDToken();                          // 需 openid scope
-        if (!idToken) throw new Error("取不到 id_token：請以 LIFF URL 開啟並登入（Login scope 至少包含 openid）");
+        if (!idToken) throw new Error("取不到 id_token：請以 LIFF URL 開啟並登入");
 
+        // 收集欄位 → x-www-form-urlencoded（simple request，跨網域最穩）
         const fd = new FormData(e.target);
         const p = new URLSearchParams();
         p.set("id_token", idToken);
@@ -163,6 +168,7 @@
           headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
           body: p.toString()
         });
+
         let json = {}; try { json = await res.json(); } catch {}
         if (!res.ok || !json.ok) throw new Error(json.message || `HTTP ${res.status}`);
 
