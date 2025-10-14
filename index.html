@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LIFF Minimal + 訂單表單</title>
+  <title>LIFF 訂單系統</title>
   <style>
     :root { --bd:#e5e7eb; --info:#fffbeb; --info-bd:#f59e0b; }
     body { font-family: system-ui, -apple-system, "Noto Sans TC", Arial; margin: 0; background: #fff; }
@@ -22,7 +22,6 @@
     .ok { color:#0f5132; }
     .err { color:#b42318; }
     .mt { margin-top: 20px; }
-
     .notice {
       background: var(--info);
       border: 1px solid var(--info-bd);
@@ -31,7 +30,6 @@
       border-radius: 12px;
       margin: 0 0 16px;
     }
-
     .btn, input[type="submit"], input[type="reset"], button {
       color:#111827 !important;
       -webkit-text-fill-color:#111827 !important;
@@ -41,7 +39,7 @@
       -webkit-appearance:none; appearance:none; cursor:pointer;
     }
     .btn:disabled { opacity:.6; cursor:not-allowed; }
-    .debug-hidden { display:none; } /* 狀態卡預設隱藏；?debug=1 顯示 */
+    .debug-hidden { display:none; }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -49,12 +47,12 @@
   <div class="wrap">
     <div class="notice">
       <b>訂單可外送時間：</b><span id="deliverWindow">08:00–17:00</span>
-      <span class="muted">（請在此區間內選擇；<b>希望送達</b>需早於<b>最晚送達</b>）</span>
+      <span class="muted">（請在此區間內選擇）</span>
     </div>
 
-    <h1>LIFF Minimal</h1>
+    <h1>訂單系統</h1>
 
-    <!-- 狀態卡（預設隱藏） -->
+    <!-- 狀態卡（debug 用） -->
     <div id="debugCard" class="card debug-hidden">
       <div class="row">狀態：<span id="status">初始化中…</span></div>
       <div class="row">顯示名稱：<span id="displayName">—</span></div>
@@ -62,7 +60,7 @@
       <div class="row actions">
         <input id="refreshBtn" type="button" value="重新取得 Profile" class="btn" />
         <input id="logoutBtn"  type="button" value="登出" class="btn" />
-        <span class="muted">請務必以 <b>LIFF URL</b> 開啟本頁，才會有 ID Token</span>
+        <span class="muted">請以 LIFF URL 開啟本頁</span>
       </div>
     </div>
 
@@ -71,12 +69,12 @@
       <div class="grid">
         <div>
           <label>客戶/店家名稱
-            <input name="customerName" required placeholder="阿綸熱炒/小郭飲料店">
+            <input name="customerName" required placeholder="例：阿綸熱炒">
           </label>
         </div>
         <div>
           <label>外送地址
-            <input name="address" required placeholder="新北市三重區○○路 1 號">
+            <input name="address" required placeholder="例：新北市三重區○○路 1 號">
           </label>
         </div>
         <div>
@@ -87,24 +85,23 @@
         <div>
           <label>訂購日期
             <input type="date" name="orderDate" required>
-            <small class="help">不可選擇過去日期（系統自動帶入今天為最小值）</small>
+            <small class="help">不可選擇過去日期</small>
           </label>
         </div>
         <div>
           <label>希望送達時間
-            <input type="time" name="startTime" required min="08:00" max="17:00" step="60" placeholder="08:00">
-            <small class="help">請選擇 <b>08:00–17:00</b> 之間的時間</small>
+            <input type="time" name="startTime" required min="08:00" max="17:00" step="60">
           </label>
         </div>
         <div>
           <label>最晚送達時間
-            <input type="time" name="endTime" required min="08:00" max="17:00" step="60" placeholder="17:00">
-            <small class="help">需與希望送達時間同在 <b>08:00–17:00</b>，且必須晚於希望送達時間</small>
+            <input type="time" name="endTime" required min="08:00" max="17:00" step="60">
           </label>
         </div>
         <div>
           <label>訂購數量（整數）
-            <input type="number" name="qty" min="1" step="1" required placeholder="例如 2">
+            <input type="number" name="qty" min="1" max="10" step="1" required placeholder="例如 2">
+            <small class="help">最多 10 包</small>
           </label>
         </div>
         <div>
@@ -119,7 +116,7 @@
 
       <div class="actions mt">
         <input id="submitBtn" type="submit" value="送出" class="btn">
-        <input id="resetBtn"  type="reset"  value="清空" class="btn">
+        <input id="resetBtn" type="reset" value="清空" class="btn">
         <span id="submitMsg" class="muted"></span>
       </div>
     </form>
@@ -127,185 +124,247 @@
 
   <script>
     // ===== 設定 =====
-    const LIFF_ID = "2008199393-AMqeEVBY";
-    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbxFQl4vXqYGTTf8jhgJ9o85F6zHRHpum9OSjqCFiX4_8x2AshTGVHwY6xV7hG9be_mJ/exec";
+    const LIFF_ID = "2008199393-AMqeEVBY";  // 替換成你的 LIFF ID
+    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwAC7kILhBfk31NO6L0JLzN4pkFcHiwBjItzi4ag-pnHER0yKxCv_25fFWmGbwcM0GN/exec";
 
-    const OPEN_MIN  = 8*60;  // 08:00
-    const CLOSE_MIN = 17*60; // 17:00
+    const OPEN_MIN = 8 * 60;   // 08:00
+    const CLOSE_MIN = 17 * 60; // 17:00
 
-    const $ = (s)=>document.querySelector(s);
-    const byName=(n)=>document.querySelector(`[name="${n}"]`);
+    const $ = s => document.querySelector(s);
+    const byName = n => document.querySelector(`[name="${n}"]`);
 
-    // 狀態卡：?debug=1 顯示
+    // 若 URL 有 ?debug=1，顯示 debug 卡
     if (new URL(location.href).searchParams.has("debug")) {
       $("#debugCard").classList.remove("debug-hidden");
     }
 
-    // 公告文字
-    function fmt(min){const h=String(Math.floor(min/60)).padStart(2,"0"); const m=String(min%60).padStart(2,"0"); return `${h}:${m}`;}
+    // 顯示可送時間區間
+    function fmt(min) {
+      const h = String(Math.floor(min / 60)).padStart(2, "0");
+      const m = String(min % 60).padStart(2, "0");
+      return `${h}:${m}`;
+    }
     $("#deliverWindow").textContent = `${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)}`;
 
-    // 預填（網址）
-    function prefillFromQuery(){
+    // 預填 URL query 值
+    function prefillFromQuery() {
       const q = new URLSearchParams(location.search);
-      ["customerName","address","phone","orderDate","startTime","endTime","qty","note"]
-        .forEach(k=>{const v=q.get(k); if(v!==null) byName(k).value=decodeURIComponent(v);});
+      ["customerName", "address", "phone", "orderDate", "startTime", "endTime", "qty", "note"]
+        .forEach(k => {
+          const v = q.get(k);
+          if (v !== null) byName(k).value = decodeURIComponent(v);
+        })
     }
 
-    // ===== 記住顧客資料（localStorage，依 userId） =====
-    const STORE_VER="v1";
-    function keyFor(uid){ return `liff:defaults:${STORE_VER}:${uid}`; }
-    function loadDefaults(uid){
-      try{
+    const STORE_VER = "v1";
+    function keyFor(uid) { return `liff:defaults:${STORE_VER}:${uid}`; }
+    function loadDefaults(uid) {
+      try {
         const s = localStorage.getItem(keyFor(uid));
-        if(!s) return;
+        if (!s) return;
         const d = JSON.parse(s);
-        if(d.customerName && !byName("customerName").value) byName("customerName").value=d.customerName;
-        if(d.address && !byName("address").value) byName("address").value=d.address;
-        if(d.phone && !byName("phone").value) byName("phone").value=d.phone;
-      }catch{}
+        if (d.customerName && !byName("customerName").value) byName("customerName").value = d.customerName;
+        if (d.address && !byName("address").value) byName("address").value = d.address;
+        if (d.phone && !byName("phone").value) byName("phone").value = d.phone;
+      } catch {}
     }
-    function saveDefaults(uid){
-      try{
+    function saveDefaults(uid) {
+      try {
         const data = {
           customerName: byName("customerName").value.trim(),
           address: byName("address").value.trim(),
           phone: byName("phone").value.trim(),
         };
         localStorage.setItem(keyFor(uid), JSON.stringify(data));
-      }catch{}
+      } catch {}
     }
-    $("#resetBtn").addEventListener("click",(ev)=>{
-      if(ev.shiftKey && window.__USER_ID__){
+    $("#resetBtn").addEventListener("click", (ev) => {
+      if (ev.shiftKey && window.__USER_ID__) {
         localStorage.removeItem(keyFor(window.__USER_ID__));
         alert("已清除此使用者的記住資料");
       }
     });
 
-    // ===== LIFF 初始化（只在載入時做一次） =====
+    // ===== LIFF 初始化 =====
     let LIFF_READY = false;
-    async function initLiffOnce(){
-      try{
-        $("#status") && ($("#status").textContent="呼叫 liff.init()…");
+    async function initLiffOnce() {
+      try {
+        $("#status") && ($("#status").textContent = "呼叫 liff.init()…");
         await liff.init({ liffId: LIFF_ID });
-        if(!liff.isLoggedIn()){ liff.login(); return; } // 會重導
-        $("#status") && ($("#status").textContent = liff.isInClient()? "已在 LINE 內開啟":"外部瀏覽器開啟");
+        if (!liff.isLoggedIn()) { liff.login(); return; }
+        $("#status") && ($("#status").textContent = liff.isInClient() ? "已在 LINE 內開啟" : "外部瀏覽器開啟");
         const p = await liff.getProfile();
         $("#displayName") && ($("#displayName").textContent = p.displayName || "—");
         $("#userId") && ($("#userId").textContent = p.userId || "—");
         window.__USER_ID__ = p.userId || "";
-        if(window.__USER_ID__) loadDefaults(window.__USER_ID__);
+        if (window.__USER_ID__) loadDefaults(window.__USER_ID__);
         LIFF_READY = true;
-      }catch(e){
-        console.error("LIFF init 失敗", e);
+      } catch (e) {
+        console.error("LIFF 初始化失敗", e);
       }
     }
 
-    // ===== 時間驗證 =====
+    // ===== 日期與時間驗證 =====
     const startEl = byName('startTime');
-    const endEl   = byName('endTime');
+    const endEl = byName('endTime');
     const timeErr = $("#timeErr");
-    [startEl,endEl].forEach(el=>{ el.min=fmt(OPEN_MIN); el.max=fmt(CLOSE_MIN); el.step=60; });
-    function toMin(t){ if(!t||!/^\d{2}:\d{2}$/.test(t)) return null; const [h,m]=t.split(":").map(Number); return h*60+m; }
-    function validateTimes(show=true){
-      const s=toMin(startEl.value), e=toMin(endEl.value);
-      let err="";
-      if(s==null||e==null){ err="請選擇「希望送達時間」與「最晚送達時間」"; }
-      else if(s<OPEN_MIN||s>CLOSE_MIN){ err=`希望送達時間需在 ${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)} 之間`; }
-      else if(e<OPEN_MIN||e>CLOSE_MIN){ err=`最晚送達時間需在 ${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)} 之間`; }
-      else if(e<=s){ err="最晚送達時間必須晚於希望送達時間"; }
-      if(show){ timeErr.style.display = err? "block":"none"; timeErr.textContent = err; }
+    [startEl, endEl].forEach(el => {
+      el.min = fmt(OPEN_MIN);
+      el.max = fmt(CLOSE_MIN);
+      el.step = 60;
+    });
+
+    function toMin(t) {
+      if (!t || !/^\d{2}:\d{2}$/.test(t)) return null;
+      const [h, m] = t.split(":").map(Number);
+      return h * 60 + m;
+    }
+
+    function validateTimes(show = true) {
+      const s = toMin(startEl.value), e = toMin(endEl.value);
+      let err = "";
+      if (s == null || e == null) {
+        err = "請選擇「希望送達時間」與「最晚送達時間」";
+      } else if (s < OPEN_MIN || s > CLOSE_MIN) {
+        err = `希望送達時間需在 ${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)} 之間`;
+      } else if (e < OPEN_MIN || e > CLOSE_MIN) {
+        err = `最晚送達時間需在 ${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)} 之間`;
+      } else if (e <= s) {
+        err = "最晚送達時間必須晚於希望送達時間";
+      }
+      if (show) {
+        timeErr.style.display = err ? "block" : "none";
+        timeErr.textContent = err;
+      }
       $("#submitBtn").disabled = !!err;
       return !err;
     }
-    startEl.addEventListener("input", ()=>validateTimes(true));
-    endEl  .addEventListener("input", ()=>validateTimes(true));
 
-    // ===== 訂購日期：最小值=今天 + 驗證（不可過去） =====
     const orderDateEl = byName("orderDate");
     const dateErr = $("#dateErr");
-    function todayISO(){
+    function todayISO() {
       const d = new Date();
       const y = d.getFullYear();
-      const m = String(d.getMonth()+1).padStart(2,"0");
-      const da = String(d.getDate()).padStart(2,"0");
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const da = String(d.getDate()).padStart(2, "0");
       return `${y}-${m}-${da}`;
     }
-    function enforceDateMin(){
+    function enforceDateMin() {
       const today = todayISO();
-      orderDateEl.min = today;       // HTML 原生限制：小於 min 視為 invalid（搭配 type=date） ①
+      orderDateEl.min = today;
       if (!orderDateEl.value || orderDateEl.value < today) {
-        orderDateEl.value = today;   // 初次載入或外部預填舊日期時，自動拉回今天
+        orderDateEl.value = today;
       }
     }
-    function validateDate(show=true){
+    function validateDate(show = true) {
       const today = orderDateEl.min || todayISO();
       const v = orderDateEl.value;
       let err = "";
-      if(!v){ err = "請選擇訂購日期"; }
-      else if(v < today){ err = "訂購日期不可早於今天"; }
-      if(show){ dateErr.style.display = err ? "block":"none"; dateErr.textContent = err; }
+      if (!v) {
+        err = "請選擇訂購日期";
+      } else if (v < today) {
+        err = "訂購日期不可早於今天";
+      }
+      if (show) {
+        dateErr.style.display = err ? "block" : "none";
+        dateErr.textContent = err;
+      }
       return !err;
     }
-    orderDateEl.addEventListener("change", ()=>validateDate(true));
+    orderDateEl.addEventListener("change", () => validateDate(true));
 
-    // ===== 三欄即時存檔 =====
-    ["customerName","address","phone"].forEach(n=>{
-      byName(n).addEventListener("change",()=>{ if(window.__USER_ID__) saveDefaults(window.__USER_ID__); });
-    });
-
-    // ===== 送單 =====
-    $("#orderForm").addEventListener("submit", async (e)=>{
+    // ===== 表單提交處理 =====
+    $("#orderForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const btn=$("#submitBtn"); const msg=$("#submitMsg");
-      msg.className="muted"; msg.textContent="送出中…"; btn.disabled=true;
+      const btn = $("#submitBtn");
+      const msg = $("#submitMsg");
+      msg.className = "muted";
+      msg.textContent = "送出中…";
+      btn.disabled = true;
 
-      // 本地驗證
+      // 驗證：日期、時間
       enforceDateMin();
-      if(!validateDate(true)){ msg.className="err"; msg.textContent="❌ 訂購日期不可早於今天"; btn.disabled=false; return; }
-      if(!validateTimes(true)){ msg.className="err"; msg.textContent="❌ 時間不在 08:00–17:00 或最晚未晚於希望"; btn.disabled=false; return; }
+      if (!validateDate(true)) {
+        msg.className = "err";
+        msg.textContent = "❌ 訂購日期不可早於今天";
+        btn.disabled = false;
+        return;
+      }
+      if (!validateTimes(true)) {
+        msg.className = "err";
+        msg.textContent = "❌ 時間不在 08:00–17:00 或最晚未晚於希望時間";
+        btn.disabled = false;
+        return;
+      }
 
-      if(!LIFF_READY){ msg.className="err"; msg.textContent="❌ LIFF 尚未就緒，請重新開啟此 LIFF 連結"; btn.disabled=false; return; }
-      if(!liff.isLoggedIn()){ msg.className="err"; msg.textContent="❌ 尚未登入，請以 LIFF URL 登入後再送出"; btn.disabled=false; return; }
+      // 驗證數量上限
+      const qtyEl = byName("qty");
+      const qtyVal = parseInt(qtyEl.value, 10);
+      if (isNaN(qtyVal) || qtyVal < 1 || qtyVal > 10) {
+        msg.className = "err";
+        msg.textContent = "❌ 數量必須是 1～10 之間的整數";
+        btn.disabled = false;
+        return;
+      }
+
+      if (!LIFF_READY) {
+        msg.className = "err";
+        msg.textContent = "❌ LIFF 尚未就緒，請重新開啟此 LIFF 連結";
+        btn.disabled = false;
+        return;
+      }
+      if (!liff.isLoggedIn()) {
+        msg.className = "err";
+        msg.textContent = "❌ 尚未登入，請以 LIFF URL 登入後再送出";
+        btn.disabled = false;
+        return;
+      }
 
       const idToken = liff.getIDToken();
-      if(!idToken){ msg.className="err"; msg.textContent="❌ 取不到 ID Token，請以 LIFF URL 開啟並登入"; btn.disabled=false; return; }
+      if (!idToken) {
+        msg.className = "err";
+        msg.textContent = "❌ 取不到 ID Token，請以 LIFF URL 開啟並登入";
+        btn.disabled = false;
+        return;
+      }
 
-      try{
-        const fd=new FormData(e.target);
-        const p=new URLSearchParams();
+      try {
+        const fd = new FormData(e.target);
+        const p = new URLSearchParams();
         p.set("id_token", idToken);
-        ["customerName","address","phone","orderDate","startTime","endTime","qty","note"]
-          .forEach(k=>p.set(k,(fd.get(k)||"").toString().trim()));
+        ["customerName", "address", "phone", "orderDate", "startTime", "endTime", "qty", "note"]
+          .forEach(k => p.set(k, (fd.get(k) || "").toString().trim()));
 
         const res = await fetch(GAS_ENDPOINT, {
-          method:"POST",
-          headers:{ "Content-Type":"application/x-www-form-urlencoded;charset=UTF-8" },
-          body:p.toString()
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+          body: p.toString()
         });
 
-        let json={}; try{ json=await res.json(); }catch{}
-        if(!res.ok || !json.ok) throw new Error(json.message || `HTTP ${res.status}`);
+        let json = {};
+        try { json = await res.json(); } catch {}
+        if (!res.ok || !json.ok) throw new Error(json.message || `HTTP ${res.status}`);
 
-        if(window.__USER_ID__) saveDefaults(window.__USER_ID__);
+        if (window.__USER_ID__) saveDefaults(window.__USER_ID__);
 
-        msg.className="ok"; msg.textContent=`已送出 ✅ 訂單編號：${json.orderId}`;
+        msg.className = "ok";
+        msg.textContent = `已送出 ✅ 訂單編號：${json.orderId}`;
         e.target.reset();
-        enforceDateMin(); // 送出後重置「今天」
+        enforceDateMin();
         validateTimes(true);
         validateDate(true);
-      }catch(err){
+      } catch (err) {
         console.error(err);
-        msg.className="err"; msg.textContent="❌ "+(err?.message||err);
-      }finally{
-        btn.disabled=false;
+        msg.className = "err";
+        msg.textContent = "❌ " + (err?.message || err);
+      } finally {
+        btn.disabled = false;
       }
     });
 
-    // 啟動
-    (async function(){
+    (async function() {
       prefillFromQuery();
-      enforceDateMin();   // 先設定今天為最小
+      enforceDateMin();
       validateDate(true);
       validateTimes(true);
       await initLiffOnce();
@@ -313,3 +372,4 @@
   </script>
 </body>
 </html>
+
