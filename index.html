@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LIFF 訂單系統</title>
+  <title>LIFF Minimal + 訂單表單</title>
   <style>
     :root { --bd:#e5e7eb; --info:#fffbeb; --info-bd:#f59e0b; }
     body { font-family: system-ui, -apple-system, "Noto Sans TC", Arial; margin: 0; background: #fff; }
@@ -22,6 +22,7 @@
     .ok { color:#0f5132; }
     .err { color:#b42318; }
     .mt { margin-top: 20px; }
+
     .notice {
       background: var(--info);
       border: 1px solid var(--info-bd);
@@ -30,6 +31,7 @@
       border-radius: 12px;
       margin: 0 0 16px;
     }
+
     .btn, input[type="submit"], input[type="reset"], button {
       color:#111827 !important;
       -webkit-text-fill-color:#111827 !important;
@@ -39,7 +41,7 @@
       -webkit-appearance:none; appearance:none; cursor:pointer;
     }
     .btn:disabled { opacity:.6; cursor:not-allowed; }
-    .debug-hidden { display:none; }
+    .debug-hidden { display:none; } /* 狀態卡預設隱藏；?debug=1 顯示 */
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -47,12 +49,12 @@
   <div class="wrap">
     <div class="notice">
       <b>訂單可外送時間：</b><span id="deliverWindow">08:00–17:00</span>
-      <span class="muted">（請在此區間內選擇）</span>
+      <span class="muted">（請在此區間內選擇；<b>希望送達</b>需早於<b>最晚送達</b>）</span>
     </div>
 
-    <h1>訂單系統</h1>
+    <h1>LIFF Minimal</h1>
 
-    <!-- 狀態卡（debug 用） -->
+    <!-- 狀態卡（預設隱藏） -->
     <div id="debugCard" class="card debug-hidden">
       <div class="row">狀態：<span id="status">初始化中…</span></div>
       <div class="row">顯示名稱：<span id="displayName">—</span></div>
@@ -60,7 +62,7 @@
       <div class="row actions">
         <input id="refreshBtn" type="button" value="重新取得 Profile" class="btn" />
         <input id="logoutBtn"  type="button" value="登出" class="btn" />
-        <span class="muted">請以 LIFF URL 開啟本頁</span>
+        <span class="muted">請務必以 <b>LIFF URL</b> 開啟本頁，才會有 ID Token</span>
       </div>
     </div>
 
@@ -69,12 +71,12 @@
       <div class="grid">
         <div>
           <label>客戶/店家名稱
-            <input name="customerName" required placeholder="例：阿綸熱炒">
+            <input name="customerName" required placeholder="阿綸熱炒/小郭飲料店">
           </label>
         </div>
         <div>
           <label>外送地址
-            <input name="address" required placeholder="例：新北市三重區○○路 1 號">
+            <input name="address" required placeholder="新北市三重區○○路 1 號">
           </label>
         </div>
         <div>
@@ -85,17 +87,19 @@
         <div>
           <label>訂購日期
             <input type="date" name="orderDate" required>
-            <small class="help">不可選擇過去日期</small>
+            <small class="help">不可選擇過去日期（系統自動帶入今天為最小值）</small>
           </label>
         </div>
         <div>
           <label>希望送達時間
-            <input type="time" name="startTime" required min="08:00" max="17:00" step="60">
+            <input type="time" name="startTime" required min="08:00" max="17:00" step="60" placeholder="08:00">
+            <small class="help">請選擇 <b>08:00–17:00</b> 之間的時間</small>
           </label>
         </div>
         <div>
           <label>最晚送達時間
-            <input type="time" name="endTime" required min="08:00" max="17:00" step="60">
+            <input type="time" name="endTime" required min="08:00" max="17:00" step="60" placeholder="17:00">
+            <small class="help">需與希望送達時間同在 <b>08:00–17:00</b>，且必須晚於希望送達時間</small>
           </label>
         </div>
         <div>
@@ -116,7 +120,7 @@
 
       <div class="actions mt">
         <input id="submitBtn" type="submit" value="送出" class="btn">
-        <input id="resetBtn" type="reset" value="清空" class="btn">
+        <input id="resetBtn"  type="reset"  value="清空" class="btn">
         <span id="submitMsg" class="muted"></span>
       </div>
     </form>
@@ -124,21 +128,21 @@
 
   <script>
     // ===== 設定 =====
-    const LIFF_ID = "2008199393-AMqeEVBY";  // 替換成你的 LIFF ID
-    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwAC7kILhBfk31NO6L0JLzN4pkFcHiwBjItzi4ag-pnHER0yKxCv_25fFWmGbwcM0GN/exec";
+    const LIFF_ID = "2008199393-AMqeEVBY";
+    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbxFQl4vXqYGTTf8jhgJ9o85F6zHRHpum9OSjqCFiX4_8x2AshTGVHwY6xV7hG9be_mJ/exec";
 
-    const OPEN_MIN = 8 * 60;   // 08:00
+    const OPEN_MIN  = 8 * 60;  // 08:00
     const CLOSE_MIN = 17 * 60; // 17:00
 
-    const $ = s => document.querySelector(s);
-    const byName = n => document.querySelector(`[name="${n}"]`);
+    const $ = (s) => document.querySelector(s);
+    const byName = (n) => document.querySelector(`[name="${n}"]`);
 
     // 若 URL 有 ?debug=1，顯示 debug 卡
     if (new URL(location.href).searchParams.has("debug")) {
       $("#debugCard").classList.remove("debug-hidden");
     }
 
-    // 顯示可送時間區間
+    // 公告文字
     function fmt(min) {
       const h = String(Math.floor(min / 60)).padStart(2, "0");
       const m = String(min % 60).padStart(2, "0");
@@ -146,16 +150,17 @@
     }
     $("#deliverWindow").textContent = `${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)}`;
 
-    // 預填 URL query 值
+    // 預填（網址）
     function prefillFromQuery() {
       const q = new URLSearchParams(location.search);
-      ["customerName", "address", "phone", "orderDate", "startTime", "endTime", "qty", "note"]
+      ["customerName","address","phone","orderDate","startTime","endTime","qty","note"]
         .forEach(k => {
           const v = q.get(k);
           if (v !== null) byName(k).value = decodeURIComponent(v);
-        })
+        });
     }
 
+    // ===== 記住顧客資料（localStorage，依 userId） =====
     const STORE_VER = "v1";
     function keyFor(uid) { return `liff:defaults:${STORE_VER}:${uid}`; }
     function loadDefaults(uid) {
@@ -185,7 +190,7 @@
       }
     });
 
-    // ===== LIFF 初始化 =====
+    // ===== LIFF 初始化（只在載入時做一次） =====
     let LIFF_READY = false;
     async function initLiffOnce() {
       try {
@@ -200,11 +205,11 @@
         if (window.__USER_ID__) loadDefaults(window.__USER_ID__);
         LIFF_READY = true;
       } catch (e) {
-        console.error("LIFF 初始化失敗", e);
+        console.error("LIFF init 失敗", e);
       }
     }
 
-    // ===== 日期與時間驗證 =====
+    // ===== 時間驗證 =====
     const startEl = byName('startTime');
     const endEl = byName('endTime');
     const timeErr = $("#timeErr");
@@ -213,13 +218,11 @@
       el.max = fmt(CLOSE_MIN);
       el.step = 60;
     });
-
     function toMin(t) {
       if (!t || !/^\d{2}:\d{2}$/.test(t)) return null;
       const [h, m] = t.split(":").map(Number);
       return h * 60 + m;
     }
-
     function validateTimes(show = true) {
       const s = toMin(startEl.value), e = toMin(endEl.value);
       let err = "";
@@ -236,10 +239,17 @@
         timeErr.style.display = err ? "block" : "none";
         timeErr.textContent = err;
       }
-      $("#submitBtn").disabled = !!err;
+      // **這裡把按鈕禁用與解除控制放在外面，不要一開始就 disable**
       return !err;
     }
+    startEl.addEventListener("input", () => {
+      validateTimes(true);
+    });
+    endEl.addEventListener("input", () => {
+      validateTimes(true);
+    });
 
+    // ===== 訂購日期驗證 =====
     const orderDateEl = byName("orderDate");
     const dateErr = $("#dateErr");
     function todayISO() {
@@ -271,35 +281,46 @@
       }
       return !err;
     }
-    orderDateEl.addEventListener("change", () => validateDate(true));
+    orderDateEl.addEventListener("change", () => {
+      validateDate(true);
+    });
 
-    // ===== 表單提交處理 =====
+    // ===== 表單提交處理（含數量 & debug） =====
     $("#orderForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = $("#submitBtn");
       const msg = $("#submitMsg");
+      console.log("submit 觸發");
       msg.className = "muted";
       msg.textContent = "送出中…";
       btn.disabled = true;
 
-      // 驗證：日期、時間
+      // 驗證：日期
       enforceDateMin();
-      if (!validateDate(true)) {
+      const okDate = validateDate(true);
+      console.log("驗證日期 ok:", okDate, "orderDate:", orderDateEl.value);
+      if (!okDate) {
         msg.className = "err";
         msg.textContent = "❌ 訂購日期不可早於今天";
         btn.disabled = false;
         return;
       }
-      if (!validateTimes(true)) {
+
+      // 驗證：時間
+      const okTime = validateTimes(true);
+      console.log("驗證時間 ok:", okTime, "start:", startEl.value, "end:", endEl.value);
+      if (!okTime) {
         msg.className = "err";
-        msg.textContent = "❌ 時間不在 08:00–17:00 或最晚未晚於希望時間";
+        msg.textContent = "❌ 時間不在 08:00–17:00 或順序錯誤";
         btn.disabled = false;
         return;
       }
 
       // 驗證數量上限
       const qtyEl = byName("qty");
+      console.log("qtyEl.value:", qtyEl.value);
       const qtyVal = parseInt(qtyEl.value, 10);
+      console.log("qtyVal:", qtyVal);
       if (isNaN(qtyVal) || qtyVal < 1 || qtyVal > 10) {
         msg.className = "err";
         msg.textContent = "❌ 數量必須是 1～10 之間的整數";
@@ -307,6 +328,8 @@
         return;
       }
 
+      // LIFF 驗證
+      console.log("LIFF_READY:", LIFF_READY, "isLoggedIn:", (liff.isLoggedIn && liff.isLoggedIn()));
       if (!LIFF_READY) {
         msg.className = "err";
         msg.textContent = "❌ LIFF 尚未就緒，請重新開啟此 LIFF 連結";
@@ -321,9 +344,10 @@
       }
 
       const idToken = liff.getIDToken();
+      console.log("idToken:", idToken);
       if (!idToken) {
         msg.className = "err";
-        msg.textContent = "❌ 取不到 ID Token，請以 LIFF URL 開啟並登入";
+        msg.textContent = "❌ 取不到 ID Token";
         btn.disabled = false;
         return;
       }
@@ -332,12 +356,12 @@
         const fd = new FormData(e.target);
         const p = new URLSearchParams();
         p.set("id_token", idToken);
-        ["customerName", "address", "phone", "orderDate", "startTime", "endTime", "qty", "note"]
+        ["customerName","address","phone","orderDate","startTime","endTime","qty","note"]
           .forEach(k => p.set(k, (fd.get(k) || "").toString().trim()));
 
         const res = await fetch(GAS_ENDPOINT, {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+          headers: { "Content-Type":"application/x-www-form-urlencoded;charset=UTF-8" },
           body: p.toString()
         });
 
@@ -351,8 +375,8 @@
         msg.textContent = `已送出 ✅ 訂單編號：${json.orderId}`;
         e.target.reset();
         enforceDateMin();
-        validateTimes(true);
         validateDate(true);
+        validateTimes(true);
       } catch (err) {
         console.error(err);
         msg.className = "err";
@@ -362,6 +386,7 @@
       }
     });
 
+    // 啟動
     (async function() {
       prefillFromQuery();
       enforceDateMin();
@@ -372,3 +397,4 @@
   </script>
 </body>
 </html>
+
