@@ -1,4 +1,4 @@
-<!-- staging test -->
+<!-- STAGING 版（已套用修正） -->
 <!doctype html>
 <html lang="zh-Hant">
 <head>
@@ -23,31 +23,23 @@
     .ok { color:#0f5132; }
     .err { color:#b42318; }
     .mt { margin-top: 20px; }
-
-    .notice {
-      background: var(--info);
-      border: 1px solid var(--info-bd);
-      color: #92400e;
-      padding: 10px 14px;
-      border-radius: 12px;
-      margin: 0 0 16px;
-    }
-
+    .notice { background: var(--info); border: 1px solid var(--info-bd); color: #92400e; padding: 10px 14px; border-radius: 12px; margin: 0 0 16px; }
+    .banner { background:#fff3cd; border:1px solid #f0ad4e; color:#7a5b00; padding:10px 14px; border-radius:12px; margin:0 0 12px; }
     .btn, input[type="submit"], input[type="reset"], button {
-      color:#111827 !important;
-      -webkit-text-fill-color:#111827 !important;
-      background:#fff;
-      border:1px solid var(--bd);
-      font-size:16px; line-height:1.2; border-radius:10px; padding:10px 14px;
+      color:#111827 !important; -webkit-text-fill-color:#111827 !important;
+      background:#fff; border:1px solid var(--bd); font-size:16px; line-height:1.2; border-radius:10px; padding:10px 14px;
       -webkit-appearance:none; appearance:none; cursor:pointer;
     }
     .btn:disabled { opacity:.6; cursor:not-allowed; }
-    .debug-hidden { display:none; } /* 狀態卡預設隱藏；?debug=1 顯示 */
+    .debug-hidden { display:none; }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
   <div class="wrap">
+    <!-- 醒目：這是測試環境 -->
+    <div class="banner">【STAGING 測試環境】此頁僅供內部測試，請勿做正式下單</div>
+
     <div class="notice">
       <b>訂單可外送時間：</b><span id="deliverWindow">08:00–17:00</span>
       <span class="muted">（請在此區間內選擇；<b>希望送達</b>需早於<b>最晚送達</b>）</span>
@@ -55,7 +47,7 @@
 
     <h1>LIFF Minimal</h1>
 
-    <!-- 狀態卡（預設隱藏） -->
+    <!-- 狀態卡（?debug=1 時顯示） -->
     <div id="debugCard" class="card debug-hidden">
       <div class="row">狀態：<span id="status">初始化中…</span></div>
       <div class="row">顯示名稱：<span id="displayName">—</span></div>
@@ -128,9 +120,9 @@
   </div>
 
   <script>
-    // ===== 設定 =====
-    const LIFF_ID = "2008199393-NjOGJm4P";
-    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbzle3bw62u7iVDthBHFvQoc7IAWAeff0F7W29kAvzeGL9kLOxMhf-3_Tk0P56ZLyc4VZQ/exec";
+    // ===== 環境設定（請確認這兩個值都是「測試用」） =====
+    const LIFF_ID = "2008199393-NjOGJm4P"; // 測試 LIFF 的 LIFF ID
+    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbzle3bw62u7iVDthBHFvQoc7IAWAeff0F7W29kAvzeGL9kLOxMhf-3_Tk0P56ZLyc4VZQ/exec"; // 測試部署的 /exec
 
     const OPEN_MIN  = 8 * 60;  // 08:00
     const CLOSE_MIN = 17 * 60; // 17:00
@@ -157,7 +149,7 @@
       ["customerName","address","phone","orderDate","startTime","endTime","qty","note"]
         .forEach(k => {
           const v = q.get(k);
-          if (v !== null) byName(k).value = decodeURIComponent(v);
+          if (v !== null) byName(k).value = v; // URLSearchParams 已解碼，勿再 decode
         });
     }
 
@@ -210,14 +202,27 @@
       }
     }
 
+    // 方便測試：重新抓 Profile / 登出
+    $("#refreshBtn")?.addEventListener("click", async () => {
+      try {
+        if (!LIFF_READY) return;
+        const p = await liff.getProfile();
+        $("#displayName") && ($("#displayName").textContent = p.displayName || "—");
+        $("#userId") && ($("#userId").textContent = p.userId || "—");
+        window.__USER_ID__ = p.userId || "";
+      } catch (e) { console.error(e); }
+    });
+    $("#logoutBtn")?.addEventListener("click", () => {
+      try { liff.logout(); } catch {}
+      location.href = location.href.split("#")[0]; // 登出後重整當前頁
+    });
+
     // ===== 時間驗證 =====
     const startEl = byName('startTime');
     const endEl = byName('endTime');
     const timeErr = $("#timeErr");
     [startEl, endEl].forEach(el => {
-      el.min = fmt(OPEN_MIN);
-      el.max = fmt(CLOSE_MIN);
-      el.step = 60;
+      el.min = fmt(OPEN_MIN); el.max = fmt(CLOSE_MIN); el.step = 60;
     });
     function toMin(t) {
       if (!t || !/^\d{2}:\d{2}$/.test(t)) return null;
@@ -227,28 +232,15 @@
     function validateTimes(show = true) {
       const s = toMin(startEl.value), e = toMin(endEl.value);
       let err = "";
-      if (s == null || e == null) {
-        err = "請選擇「希望送達時間」與「最晚送達時間」";
-      } else if (s < OPEN_MIN || s > CLOSE_MIN) {
-        err = `希望送達時間需在 ${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)} 之間`;
-      } else if (e < OPEN_MIN || e > CLOSE_MIN) {
-        err = `最晚送達時間需在 ${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)} 之間`;
-      } else if (e <= s) {
-        err = "最晚送達時間必須晚於希望送達時間";
-      }
-      if (show) {
-        timeErr.style.display = err ? "block" : "none";
-        timeErr.textContent = err;
-      }
-      // **這裡把按鈕禁用與解除控制放在外面，不要一開始就 disable**
+      if (s == null || e == null) err = "請選擇「希望送達時間」與「最晚送達時間」";
+      else if (s < OPEN_MIN || s > CLOSE_MIN) err = `希望送達時間需在 ${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)} 之間`;
+      else if (e < OPEN_MIN || e > CLOSE_MIN) err = `最晚送達時間需在 ${fmt(OPEN_MIN)}–${fmt(CLOSE_MIN)} 之間`;
+      else if (e <= s) err = "最晚送達時間必須晚於希望送達時間";
+      if (show) { timeErr.style.display = err ? "block" : "none"; timeErr.textContent = err; }
       return !err;
     }
-    startEl.addEventListener("input", () => {
-      validateTimes(true);
-    });
-    endEl.addEventListener("input", () => {
-      validateTimes(true);
-    });
+    startEl.addEventListener("input", () => validateTimes(true));
+    endEl.addEventListener("input", () => validateTimes(true));
 
     // ===== 訂購日期驗證 =====
     const orderDateEl = byName("orderDate");
@@ -263,95 +255,43 @@
     function enforceDateMin() {
       const today = todayISO();
       orderDateEl.min = today;
-      if (!orderDateEl.value || orderDateEl.value < today) {
-        orderDateEl.value = today;
-      }
+      if (!orderDateEl.value || orderDateEl.value < today) orderDateEl.value = today;
     }
     function validateDate(show = true) {
       const today = orderDateEl.min || todayISO();
       const v = orderDateEl.value;
       let err = "";
-      if (!v) {
-        err = "請選擇訂購日期";
-      } else if (v < today) {
-        err = "訂購日期不可早於今天";
-      }
-      if (show) {
-        dateErr.style.display = err ? "block" : "none";
-        dateErr.textContent = err;
-      }
+      if (!v) err = "請選擇訂購日期";
+      else if (v < today) err = "訂購日期不可早於今天";
+      if (show) { dateErr.style.display = err ? "block" : "none"; dateErr.textContent = err; }
       return !err;
     }
-    orderDateEl.addEventListener("change", () => {
-      validateDate(true);
-    });
+    orderDateEl.addEventListener("change", () => validateDate(true));
 
-    // ===== 表單提交處理（含數量 & debug） =====
+    // ===== 表單提交處理 =====
     $("#orderForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = $("#submitBtn");
       const msg = $("#submitMsg");
-      console.log("submit 觸發");
       msg.className = "muted";
       msg.textContent = "送出中…";
       btn.disabled = true;
 
-      // 驗證：日期
       enforceDateMin();
-      const okDate = validateDate(true);
-      console.log("驗證日期 ok:", okDate, "orderDate:", orderDateEl.value);
-      if (!okDate) {
-        msg.className = "err";
-        msg.textContent = "❌ 訂購日期不可早於今天";
-        btn.disabled = false;
-        return;
-      }
+      if (!validateDate(true)) { msg.className = "err"; msg.textContent = "❌ 訂購日期不可早於今天"; btn.disabled = false; return; }
+      if (!validateTimes(true)) { msg.className = "err"; msg.textContent = "❌ 時間不在 08:00–17:00 或順序錯誤"; btn.disabled = false; return; }
 
-      // 驗證：時間
-      const okTime = validateTimes(true);
-      console.log("驗證時間 ok:", okTime, "start:", startEl.value, "end:", endEl.value);
-      if (!okTime) {
-        msg.className = "err";
-        msg.textContent = "❌ 時間不在 08:00–17:00 或順序錯誤";
-        btn.disabled = false;
-        return;
-      }
-
-      // 驗證數量上限
       const qtyEl = byName("qty");
-      console.log("qtyEl.value:", qtyEl.value);
       const qtyVal = parseInt(qtyEl.value, 10);
-      console.log("qtyVal:", qtyVal);
       if (isNaN(qtyVal) || qtyVal < 1 || qtyVal > 10) {
-        msg.className = "err";
-        msg.textContent = "❌ 數量必須是 1～10 之間的整數";
-        btn.disabled = false;
-        return;
+        msg.className = "err"; msg.textContent = "❌ 數量必須是 1～10 之間的整數"; btn.disabled = false; return;
       }
 
-      // LIFF 驗證
-      console.log("LIFF_READY:", LIFF_READY, "isLoggedIn:", (liff.isLoggedIn && liff.isLoggedIn()));
-      if (!LIFF_READY) {
-        msg.className = "err";
-        msg.textContent = "❌ LIFF 尚未就緒，請重新開啟此 LIFF 連結";
-        btn.disabled = false;
-        return;
-      }
-      if (!liff.isLoggedIn()) {
-        msg.className = "err";
-        msg.textContent = "❌ 尚未登入，請以 LIFF URL 登入後再送出";
-        btn.disabled = false;
-        return;
-      }
+      if (!LIFF_READY) { msg.className = "err"; msg.textContent = "❌ LIFF 尚未就緒，請重新開啟此 LIFF 連結"; btn.disabled = false; return; }
+      if (!liff.isLoggedIn()) { msg.className = "err"; msg.textContent = "❌ 尚未登入，請以 LIFF URL 登入後再送出"; btn.disabled = false; return; }
 
       const idToken = liff.getIDToken();
-      console.log("idToken:", idToken);
-      if (!idToken) {
-        msg.className = "err";
-        msg.textContent = "❌ 取不到 ID Token";
-        btn.disabled = false;
-        return;
-      }
+      if (!idToken) { msg.className = "err"; msg.textContent = "❌ 取不到 ID Token"; btn.disabled = false; return; }
 
       try {
         const fd = new FormData(e.target);
@@ -360,11 +300,18 @@
         ["customerName","address","phone","orderDate","startTime","endTime","qty","note"]
           .forEach(k => p.set(k, (fd.get(k) || "").toString().trim()));
 
+        // 逾時保護
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 15000);
+
         const res = await fetch(GAS_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type":"application/x-www-form-urlencoded;charset=UTF-8" },
-          body: p.toString()
-        });
+          body: p.toString(),
+          signal: controller.signal
+        }).catch(err => { throw new Error(err.name === "AbortError" ? "連線逾時，請稍後再試" : err.message); });
+
+        clearTimeout(timer);
 
         let json = {};
         try { json = await res.json(); } catch {}
