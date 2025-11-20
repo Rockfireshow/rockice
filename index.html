@@ -129,7 +129,7 @@
 
   <script>
     // ===== 設定 =====
-    const LIFF_ID = "2008199393-AMqeEVBY";
+    const LIFF_ID = "2008199393-NjOGJm4P";
     const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbz81CJcKY9WsjzTBJBw1v_tVpjiiCc_EfNZr_QUaPsQ7DfTqlG8llSVC08o8mu8kvpM/exec";
 
     const OPEN_MIN  = 8 * 60;  // 08:00
@@ -197,7 +197,7 @@
       try {
         $("#status") && ($("#status").textContent = "呼叫 liff.init()…");
         await liff.init({ liffId: LIFF_ID });
-        if (!liff.isLoggedIn()) { liff.login(); return; }
+        if (!liff.isLoggedIn()) { liff.login({ redirectUri: window.location.href }); return; }
         $("#status") && ($("#status").textContent = liff.isInClient() ? "已在 LINE 內開啟" : "外部瀏覽器開啟");
         const p = await liff.getProfile();
         $("#displayName") && ($("#displayName").textContent = p.displayName || "—");
