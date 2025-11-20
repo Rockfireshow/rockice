@@ -1,4 +1,4 @@
-<!-- STAGING 版（AM/PM 按鈕選時段 + 預約規則 + 備註記憶） -->
+<!-- STAGING 版（AM/PM 選時段 + 預約規則 + 成功提示 + 醒目送出鈕） -->
 <!doctype html>
 <html lang="zh-Hant">
 <head>
@@ -6,7 +6,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>LIFF Minimal + 訂單表單</title>
   <style>
-    :root { --bd:#e5e7eb; --info:#fffbeb; --info-bd:#f59e0b; }
+    :root {
+      --bd:#e5e7eb; --info:#fffbeb; --info-bd:#f59e0b;
+      --primary:#111827; /* 主色：近黑 */
+      --primary-contrast:#fff;
+      --ok-bg:#d1fae5; --ok-bd:#10b981; --ok-fg:#065f46;
+    }
     body { font-family: system-ui, -apple-system, "Noto Sans TC", Arial; margin: 0; background: #fff; }
     .wrap { max-width: 960px; margin: 0 auto; padding: 24px; }
     h1 { font-size: 28px; margin: 0 0 16px; }
@@ -23,29 +28,49 @@
     .mt { margin-top: 20px; }
     .notice { background: var(--info); border: 1px solid var(--info-bd); color: #92400e; padding: 10px 14px; border-radius: 12px; margin: 0 0 16px; }
     .banner { background:#fff3cd; border:1px solid #f0ad4e; color:#7a5b00; padding:10px 14px; border-radius:12px; margin:0 0 12px; }
+
     .row { margin: 8px 0; }
+
     .btn, input[type="submit"], input[type="reset"], button {
       color:#111827 !important; -webkit-text-fill-color:#111827 !important;
       background:#fff; border:1px solid var(--bd); font-size:16px; line-height:1.2; border-radius:10px; padding:10px 14px;
       -webkit-appearance:none; appearance:none; cursor:pointer;
+      transition: transform .02s ease, box-shadow .2s ease;
     }
-    .btn:disabled { opacity:.6; cursor:not-allowed; }
-    .seg {
-      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    .btn:active { transform: translateY(1px); }
+    .btn-primary {
+      background: var(--primary); color: var(--primary-contrast) !important; -webkit-text-fill-color: var(--primary-contrast) !important;
+      border: 1px solid var(--primary);
+      box-shadow: 0 6px 18px rgba(17,24,39,.15);
+      font-weight:600;
     }
+    .btn-primary:disabled { opacity:.6; cursor:not-allowed; box-shadow:none; }
+
+    .seg { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .seg .opt {
-      border:1px solid var(--bd); border-radius:10px; padding:10px 14px; cursor:pointer; user-select:none;
+      border:2px solid var(--bd); border-radius:12px; padding:10px 14px; cursor:pointer; user-select:none;
+      transition: border-color .15s ease, box-shadow .15s ease, color .15s ease;
     }
-    .seg .opt[aria-pressed="true"] { outline:2px solid #111827; }
+    .seg .opt[aria-pressed="true"] { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(17,24,39,.12); font-weight:600; }
     .seg .opt[aria-disabled="true"] { opacity:.45; cursor:not-allowed; }
+
     .debug-hidden { display:none; }
+
+    /* 成功提示 Toast */
+    .toast {
+      position: fixed; inset: auto 16px 16px 16px; /* bottom */
+      background: var(--ok-bg); border:1px solid var(--ok-bd); color: var(--ok-fg);
+      padding: 10px 14px; border-radius: 12px; font-size: 14px; display:none;
+      box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    }
+    .toast.show { display:block; animation: fadein .18s ease; }
+    @keyframes fadein { from{opacity:0; transform: translateY(8px);} to{opacity:1; transform: translateY(0);} }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
   <div class="wrap">
     <div class="banner">【STAGING 測試環境】此頁僅供內部測試，請勿做正式下單</div>
-
     <div class="notice">
       <b>配送時段：</b>上午 08:00–12:00；下午 15:00–17:00。
       <span class="muted">（依你下單的時間，自動限制可預約日期與時段）</span>
@@ -88,7 +113,7 @@
           </label>
         </div>
 
-        <!-- 改為 AM/PM 二選一 -->
+        <!-- AM/PM 二選一 -->
         <div>
           <label>選擇配送時段</label>
           <div class="seg" role="group" aria-label="配送時段">
@@ -112,84 +137,86 @@
         </div>
       </div>
 
-      <!-- 隱藏欄位：送後端 -->
+      <!-- 隱藏欄位送後端 -->
       <input type="hidden" name="startTime">
       <input type="hidden" name="endTime">
       <input type="hidden" name="slot"> <!-- AM/PM -->
 
-      <div class="row mt">
-        <input id="submitBtn" type="submit" value="送出" class="btn">
+      <div class="row mt" style="display:flex; align-items:center; gap:10px;">
+        <input id="submitBtn" type="submit" value="送出" class="btn btn-primary" style="min-width:140px">
         <input id="resetBtn"  type="reset"  value="清空" class="btn">
         <span id="submitMsg" class="muted"></span>
       </div>
     </form>
   </div>
 
+  <!-- 成功提示 -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
   <script>
     // ===== 環境常數（請確認為測試值） =====
     const LIFF_ID = "2008199393-NjOGJm4P"; // 測試 LIFF
-    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbzle3bw62u7iVDthBHFvQoc7IAWAeff0F7W29kAvzeGL9kLOxMhf-3_Tk0P56ZLyc4VZQ/exec"; // 測試部署 /exec
+    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbzle3bw62u7iVDthBHFvQoc7IAWAeff0F7W29kAvzeGL9kLOxMhf-3_Tk0P56ZLyc4VZQ/exec"; // 測試 /exec
 
     // 時段常數
     const AM = { key: "AM", start: "08:00", end: "12:00" };
     const PM = { key: "PM", start: "15:00", end: "17:00" };
 
-    // 規則：依「下單當下時間」限制使用者可選內容
-    // 07:00–12:59 下單：今天只能 PM；明天(含)以後 AM/PM 都可
-    // 13:00–隔天 06:59 下單：今天不可選；明天只能 AM；明天以後 AM/PM 都可
-    const NOW = new Date(); // 以裝置本地時間為準（台灣）
+    // 規則：依「下單當下時間」限制
+    // 07:00–12:59：今天只能 PM；明天(含)以後 AM/PM 皆可
+    // 13:00–隔日 06:59：今天不可；明天(含)以後 AM/PM 皆可（自動把日期跳到明天）
+    const NOW = new Date(); // 以裝置本地時間（台灣）為準
     const nowMin = NOW.getHours() * 60 + NOW.getMinutes();
     const MIN_07_00 = 7*60, MIN_12_59 = 12*60 + 59, MIN_13_00 = 13*60, MIN_06_59 = 6*60 + 59;
 
     const $ = (s) => document.querySelector(s);
     const byName = (n) => document.querySelector(`[name="${n}"]`);
 
-    // ===== Debug 卡顯示控制 =====
+    // Debug 卡
     if (new URL(location.href).searchParams.has("debug")) {
       $("#debugCard").classList.remove("debug-hidden");
     }
 
-    // ===== 日期輔助 =====
+    // 日期輔助
     function toISODate(d) {
       const y = d.getFullYear();
       const m = String(d.getMonth()+1).padStart(2,"0");
       const da = String(d.getDate()).padStart(2,"0");
       return `${y}-${m}-${da}`;
     }
-    function parseISODate(s) { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); }
-    function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+    function parseISODate(s){ const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+    function addDays(d, n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
     const today = toISODate(NOW);
     const tomorrow = toISODate(addDays(NOW,1));
 
-    // ===== LIFF 初始化（允許先就緒，再抓 profile） =====
+    // LIFF 初始化（先就緒，再抓 profile）
     let LIFF_READY = false;
-    async function initLiff() {
-      try {
+    async function initLiff(){
+      try{
         await liff.init({ liffId: LIFF_ID });
         if (!liff.isLoggedIn()) { liff.login({ redirectUri: window.location.href }); return; }
-        LIFF_READY = true; // 先標記就緒
-        try {
+        LIFF_READY = true;
+        try{
           const p = await liff.getProfile();
           $("#displayName").textContent = p.displayName || "—";
           $("#userId").textContent = p.userId || "—";
           window.__USER_ID__ = p.userId || "";
           if (window.__USER_ID__) loadDefaults(window.__USER_ID__);
-        } catch(e){ console.warn("getProfile 失敗（可能尚未授權 profile）", e); }
-      } catch(e){ console.error("liff.init 失敗", e); }
+        }catch(e){ console.warn("getProfile 失敗（可能尚未授權 profile）", e); }
+      }catch(e){ console.error("liff.init 失敗", e); }
     }
 
-    // ===== 儲存/讀取記住資料（含備註） =====
-    const STORE_VER = "v2"; // 變更版本（新增 note）
+    // 記住資料（含備註）
+    const STORE_VER = "v2";
     function keyFor(uid){ return `liff:defaults:${STORE_VER}:${uid}`; }
     function loadDefaults(uid){
       try{
-        const raw = localStorage.getItem(keyFor(uid));
-        if(!raw) return;
+        const raw = localStorage.getItem(keyFor(uid)); if(!raw) return;
         const d = JSON.parse(raw);
         if (d.customerName && !byName("customerName").value) byName("customerName").value = d.customerName;
         if (d.address && !byName("address").value) byName("address").value = d.address;
         if (d.phone && !byName("phone").value) byName("phone").value = d.phone;
-        if (d.note && !byName("note").value) byName("note").value = d.note; // 新增：備註帶入
+        if (d.note && !byName("note").value) byName("note").value = d.note;
       }catch{}
     }
     function saveDefaults(uid){
@@ -198,7 +225,7 @@
           customerName: byName("customerName").value.trim(),
           address: byName("address").value.trim(),
           phone: byName("phone").value.trim(),
-          note: byName("note").value.trim(), // 新增：備註
+          note: byName("note").value.trim(),
         };
         localStorage.setItem(keyFor(uid), JSON.stringify(data));
       }catch{}
@@ -210,61 +237,41 @@
       }
     });
 
-    // ===== AM/PM 選擇控制 =====
-    const optAM = $("#optAM");
-    const optPM = $("#optPM");
-    function setSlot(slot){ // slot: AM | PM | null
+    // AM/PM 選擇
+    const optAM = $("#optAM"), optPM = $("#optPM");
+    function setSlot(slot){
       const st = byName("startTime"), et = byName("endTime"), sl = byName("slot");
-      if(slot === AM.key){
-        st.value = AM.start; et.value = AM.end; sl.value = AM.key;
-        optAM.setAttribute("aria-pressed","true"); optPM.setAttribute("aria-pressed","false");
-      }else if(slot === PM.key){
-        st.value = PM.start; et.value = PM.end; sl.value = PM.key;
-        optAM.setAttribute("aria-pressed","false"); optPM.setAttribute("aria-pressed","true");
-      }else{
-        st.value = et.value = sl.value = "";
-        optAM.setAttribute("aria-pressed","false"); optPM.setAttribute("aria-pressed","false");
-      }
+      if(slot === AM.key){ st.value=AM.start; et.value=AM.end; sl.value=AM.key; optAM.setAttribute("aria-pressed","true"); optPM.setAttribute("aria-pressed","false"); }
+      else if(slot === PM.key){ st.value=PM.start; et.value=PM.end; sl.value=PM.key; optAM.setAttribute("aria-pressed","false"); optPM.setAttribute("aria-pressed","true"); }
+      else { st.value=et.value=sl.value=""; optAM.setAttribute("aria-pressed","false"); optPM.setAttribute("aria-pressed","false"); }
     }
-    function enableAM(en){ optAM.setAttribute("aria-disabled", en? "false":"true"); if(!en) optAM.classList.add("muted"); else optAM.classList.remove("muted"); }
-    function enablePM(en){ optPM.setAttribute("aria-disabled", en? "false":"true"); if(!en) optPM.classList.add("muted"); else optPM.classList.remove("muted"); }
+    function setDisabled(el, disabled){
+      el.setAttribute("aria-disabled", disabled? "true":"false");
+      el.style.opacity = disabled? .45 : 1;
+      el.style.pointerEvents = disabled? "none" : "auto";
+    }
+    optAM.addEventListener("click", ()=>{ if(optAM.getAttribute("aria-disabled")==="true") return; setSlot(AM.key); $("#slotErr").style.display="none"; });
+    optPM.addEventListener("click", ()=>{ if(optPM.getAttribute("aria-disabled")==="true") return; setSlot(PM.key); $("#slotErr").style.display="none"; });
 
-    function clickAM(){
-      if(optAM.getAttribute("aria-disabled")==="true") return;
-      setSlot(AM.key);
-      $("#slotErr").style.display="none";
-    }
-    function clickPM(){
-      if(optPM.getAttribute("aria-disabled")==="true") return;
-      setSlot(PM.key);
-      $("#slotErr").style.display="none";
-    }
-    optAM.addEventListener("click", clickAM);
-    optPM.addEventListener("click", clickPM);
-
-    // ===== 根據「現在時間」與「使用者選的日期」動態限制 =====
-    const orderDateEl = byName("orderDate");
-    const dateHelp = $("#dateHelp");
+    // 規則計算
     function policyFor(dateStr){
       // 回傳 { allowToday, allowAM, allowPM, note }
       const d = parseISODate(dateStr);
       const isToday = toISODate(d) === today;
       const isTomorrow = toISODate(d) === tomorrow;
 
-      // 13:00–隔日06:59：今天不可；明天只能 AM；明天以後 AM/PM 都可
+      // 13:00–隔日06:59：今天不可；明天起 上午/下午 都可
       if (nowMin >= MIN_13_00 || nowMin <= MIN_06_59) {
         if (isToday) return { allowToday:false, allowAM:false, allowPM:false, note:"現在時間為 13:00–隔日 06:59，不能預約今天" };
-        if (isTomorrow) return { allowToday:true, allowAM:true, allowPM:false, note:"明天僅可預約上午（08:00–12:00）" };
+        if (isTomorrow) return { allowToday:true, allowAM:true, allowPM:true, note:"明天可預約上午/下午（今天不可）" };
         return { allowToday:true, allowAM:true, allowPM:true, note:"明天(含)以後皆可預約上午/下午" };
       }
-
-      // 07:00–12:59：今天只能 PM；明天(含)以後 AM/PM 都可
+      // 07:00–12:59：今天僅可 PM；明天(含)以後 AM/PM 皆可
       if (nowMin >= MIN_07_00 && nowMin <= MIN_12_59) {
         if (isToday) return { allowToday:true, allowAM:false, allowPM:true, note:"今天僅可預約下午（15:00–17:00）" };
         return { allowToday:true, allowAM:true, allowPM:true, note:"明天(含)以後皆可預約上午/下午" };
       }
-
-      // 其它時段（00:00–06:59 其實已被上面涵蓋；這裡保險處理成與 13:00–06:59 相同）
+      // 其他邊界（保險）
       if (isToday) return { allowToday:false, allowAM:false, allowPM:false, note:"目前不可預約今天" };
       return { allowToday:true, allowAM:true, allowPM:true, note:"" };
     }
@@ -272,80 +279,84 @@
     function enforceMinDate(){
       // 13:00–隔日06:59：minDate = 明天；否則 minDate = 今天
       const minDate = (nowMin >= MIN_13_00 || nowMin <= MIN_06_59) ? tomorrow : today;
-      orderDateEl.min = minDate;
-      if (!orderDateEl.value || orderDateEl.value < minDate) orderDateEl.value = minDate;
+      const el = byName("orderDate");
+      el.min = minDate;
+      if (!el.value || el.value < minDate) el.value = minDate;
     }
 
+    const orderDateEl = byName("orderDate");
+    const dateHelp = $("#dateHelp");
     function refreshSlotLimit(){
       const pol = policyFor(orderDateEl.value);
       dateHelp.textContent = pol.note;
 
-      // 先清空選擇
-      setSlot(null);
-      // 根據可用性開關
-      enableAM(pol.allowAM);
-      enablePM(pol.allowPM);
+      // 控制可用性
+      setDisabled(optAM, !pol.allowAM);
+      setDisabled(optPM, !pol.allowPM);
 
-      // 自動選擇一個可用的（方便使用者）
+      // 清空現有選擇
+      setSlot(null);
+
+      // 預設勾選上午（若上午可選）；否則選下午
       if (pol.allowAM) setSlot(AM.key);
       else if (pol.allowPM) setSlot(PM.key);
 
-      // 如果今天不可選但使用者手動選到今天，強制跳到合法最小日
+      // 若今天不可但日期仍是今天，強制跳到明天並重算
       if (!pol.allowToday && orderDateEl.value === today) {
         orderDateEl.value = tomorrow;
         refreshSlotLimit();
       }
     }
-
     orderDateEl.addEventListener("change", refreshSlotLimit);
 
-    // ===== 預填網址參數（不再 decode 二次） =====
+    // 預填網址參數
     function prefillFromQuery(){
       const q = new URLSearchParams(location.search);
       ["customerName","address","phone","orderDate","qty","note"]
         .forEach(k => { const v = q.get(k); if (v!==null) byName(k).value = v; });
     }
 
-    // ===== 送單流程（無需再驗證手動時間欄位） =====
+    // 成功提示
+    function showToast(msg){
+      const t = $("#toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(()=> t.classList.remove("show"), 3200);
+    }
+
+    // 送單
     $("#orderForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = $("#submitBtn"), msg = $("#submitMsg");
       msg.className = "muted"; msg.textContent = "送出中…"; btn.disabled = true;
 
-      // 基礎驗證
       enforceMinDate();
       refreshSlotLimit();
 
-      // 檢查是否選到可用時段
       if (!byName("slot").value) {
         $("#slotErr").style.display="block";
         $("#slotErr").textContent = "請選擇可預約的時段（上午或下午）";
         btn.disabled = false; return;
       }
-
-      // 數量
       const qtyVal = parseInt(byName("qty").value, 10);
       if (isNaN(qtyVal) || qtyVal < 1 || qtyVal > 10) {
         msg.className = "error"; msg.textContent = "❌ 數量必須是 1～10 之間的整數"; btn.disabled = false; return;
       }
-
       if (!LIFF_READY || !liff.isLoggedIn()) {
         msg.className = "error"; msg.textContent = "❌ LIFF 尚未就緒或未登入，請重新開啟此 LIFF 連結"; btn.disabled = false; return;
       }
       const idToken = liff.getIDToken();
       if (!idToken) { msg.className="error"; msg.textContent="❌ 取不到 ID Token"; btn.disabled=false; return; }
 
-      try {
+      try{
         const fd = new FormData(e.target);
         const p = new URLSearchParams();
         p.set("id_token", idToken);
         ["customerName","address","phone","orderDate","startTime","endTime","qty","note","slot"]
           .forEach(k => p.set(k, (fd.get(k)||"").toString().trim()));
 
-        // 逾時保護
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 15000);
-
         const res = await fetch(GAS_ENDPOINT, {
           method:"POST",
           headers:{ "Content-Type":"application/x-www-form-urlencoded;charset=UTF-8" },
@@ -357,26 +368,30 @@
         let json = {}; try{ json = await res.json(); }catch{}
         if (!res.ok || !json.ok) throw new Error(json.message || `HTTP ${res.status}`);
 
-        if (window.__USER_ID__) saveDefaults(window.__USER_ID__); // 記住備註
+        if (window.__USER_ID__) saveDefaults(window.__USER_ID__);
 
         msg.className = "ok";
         msg.textContent = `已送出 ✅ 訂單編號：${json.orderId}`;
+        showToast(`已送出 ✅ 訂單編號：${json.orderId}`);
+
         e.target.reset();
         enforceMinDate(); refreshSlotLimit();
-      } catch(err){
+      }catch(err){
         console.error(err);
         msg.className = "error";
         msg.textContent = "❌ " + (err?.message || err);
-      } finally { btn.disabled = false; }
+      }finally{
+        btn.disabled = false;
+      }
     });
 
-    // ===== 方便測試：重新抓 Profile / 登出 =====
+    // 測試用：refresh / logout
     $("#refreshBtn")?.addEventListener("click", async () => {
-      try { const p = await liff.getProfile(); $("#displayName").textContent = p.displayName||"—"; $("#userId").textContent = p.userId||"—"; } catch(e){}
+      try{ const p = await liff.getProfile(); $("#displayName").textContent = p.displayName||"—"; $("#userId").textContent = p.userId||"—"; }catch(e){}
     });
     $("#logoutBtn")?.addEventListener("click", () => { try{ liff.logout(); }catch{} location.href = location.href.split("#")[0]; });
 
-    // ===== 啟動 =====
+    // 啟動
     (async function(){
       prefillFromQuery();
       enforceMinDate();
