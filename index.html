@@ -254,7 +254,7 @@
     const orderDateEl = byName("orderDate");
     const dateHelp = $("#dateHelp");
     function enforceMinDate(){
-      const minDate = (nowMin >= MIN_13_00 || nowMin <= MIN_23_59) ? tomorrow : today;
+      const minDate = (nowMin >= MIN_13_00 && nowMin <= MIN_23_59) ? tomorrow : today;
       orderDateEl.min = minDate;
       if (!orderDateEl.value || orderDateEl.value < minDate) orderDateEl.value = minDate;
     }
