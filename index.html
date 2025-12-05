@@ -150,7 +150,7 @@
     // 13:00–隔日 06:59：今天不可；明天(含)以後 AM/PM 皆可（自動把日期跳到明天）
     const NOW = new Date();              // 以使用者本地時間為準（台灣）
     const nowMin = NOW.getHours()*60 + NOW.getMinutes();
-    const MIN_07_00 = 7*60, MIN_12_59 = 12*60+59, MIN_13_00 = 13*60, MIN_06_59 = 6*60+59;
+    const MIN_07_00 = 7*60, MIN_12_59 = 12*60+59, MIN_13_00 = 13*60, MIN_06_59 = 6*60+59, MIN_23_59 = 23*60+59;
 
     const $ = (s)=>document.querySelector(s);
     const byName = (n)=>document.querySelector(`[name="${n}"]`);
@@ -254,7 +254,7 @@
     const orderDateEl = byName("orderDate");
     const dateHelp = $("#dateHelp");
     function enforceMinDate(){
-      const minDate = (nowMin >= MIN_13_00 || nowMin <= MIN_06_59) ? tomorrow : today;
+      const minDate = (nowMin >= MIN_13_00 || nowMin <= MIN_23_59) ? tomorrow : today;
       orderDateEl.min = minDate;
       if (!orderDateEl.value || orderDateEl.value < minDate) orderDateEl.value = minDate;
     }
