@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>吉恩冰塊 訂單表單</title>
+
   <style>
     :root {
       --bd:#e5e7eb; --info:#f8fafc; --info-bd:#cbd5e1;
@@ -11,17 +12,34 @@
       --primary-contrast:#fff;
       --ok-bg:#d1fae5; --ok-bd:#10b981; --ok-fg:#065f46;
     }
-    body { font-family: system-ui, -apple-system, "Noto Sans TC", Arial; margin:0; background:#fff; }
+    body {
+      font-family: system-ui, -apple-system, "Noto Sans TC", Arial;
+      margin:0;
+      background:#fff;
+    }
     .wrap { max-width:960px; margin:0 auto; padding:24px; }
     h1 { font-size:28px; margin:0 0 16px; }
     h2 { font-size:20px; margin:0 0 12px; }
 
-    .card { border:1px solid var(--bd); border-radius:14px; padding:16px; background:#fff; }
-    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .card {
+      border:1px solid var(--bd);
+      border-radius:14px;
+      padding:16px;
+      background:#fff;
+    }
+    .grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:14px;
+    }
     label { display:block; font-size:14px; color:#111827; }
     input, textarea {
-      width:100%; box-sizing:border-box; padding:10px 12px;
-      border:1px solid var(--bd); border-radius:10px; background:#fff;
+      width:100%;
+      box-sizing:border-box;
+      padding:10px 12px;
+      border:1px solid var(--bd);
+      border-radius:10px;
+      background:#fff;
     }
     textarea { resize:vertical; }
 
@@ -29,46 +47,87 @@
     .error { color:#b42318; font-size:13px; margin-top:8px; }
     .muted { color:#6b7280; font-size:13px; }
     .mt { margin-top:20px; }
-
-    .notice {
-      background:var(--info); border:1px solid var(--info-bd); color:#334155;
-      padding:10px 14px; border-radius:12px; margin:0 0 16px;
-    }
-
     .row { margin:8px 0; }
 
-    .btn, input[type="submit"], input[type="reset"], button {
-      color:#111827 !重要; -webkit-text-fill-color:#111827 !重要;
-      background:#fff; border:1px solid var(--bd); font-size:16px; line-height:1.2; border-radius:10px; padding:10px 14px;
-      -webkit-appearance:none; appearance:none; cursor:pointer;
+    .notice {
+      background:var(--info);
+      border:1px solid var(--info-bd);
+      color:#334155;
+      padding:10px 14px;
+      border-radius:12px;
+      margin:0 0 16px;
+    }
+
+    /* ==== 按鈕：改成不使用 -webkit-text-fill-color，避免 LINE 看不到字 ==== */
+    .btn {
+      color:#111827;
+      background:#fff;
+      border:1px solid var(--bd);
+      font-size:16px;
+      line-height:1.2;
+      border-radius:10px;
+      padding:10px 14px;
+      -webkit-appearance:none;
+      appearance:none;
+      cursor:pointer;
       transition: transform .02s ease, box-shadow .2s ease;
     }
     .btn:active { transform: translateY(1px); }
     .btn-primary {
       background: var(--primary);
-      color: var(--primary-contrast) !重要;
-      -webkit-text-fill-color: var(--primary-contrast) !重要;
-      border:1px solid var(--primary); box-shadow:0 6px 18px rgba(17,24,39,.15); font-weight:600;
+      color: var(--primary-contrast);
+      border:1px solid var(--primary);
+      box-shadow:0 6px 18px rgba(17,24,39,.15);
+      font-weight:600;
     }
-    .btn-primary:disabled { opacity:.6; cursor:not-allowed; box-shadow:none; }
+    .btn-primary:disabled {
+      opacity:.6;
+      cursor:not-allowed;
+      box-shadow:none;
+    }
 
-    .seg { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .seg {
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
     .seg .opt {
-      border:2px solid var(--bd); border-radius:12px; padding:10px 14px; cursor:pointer; user-select:none;
+      border:2px solid var(--bd);
+      border-radius:12px;
+      padding:10px 14px;
+      cursor:pointer;
+      user-select:none;
       transition:border-color .15s ease, box-shadow .15s ease;
     }
-    .seg .opt[aria-pressed="true"] { border-color:var(--primary); box-shadow:0 0 0 3px rgba(17,24,39,.12); font-weight:600; }
-    .seg .opt[aria-disabled="true"] { opacity:.45; cursor:not-allowed; }
+    .seg .opt[aria-pressed="true"] {
+      border-color:var(--primary);
+      box-shadow:0 0 0 3px rgba(17,24,39,.12);
+      font-weight:600;
+    }
+    .seg .opt[aria-disabled="true"] {
+      opacity:.45;
+      cursor:not-allowed;
+    }
 
     .toast {
-      position:fixed; inset:auto 16px 16px 16px;
-      background:var(--ok-bg); border:1px solid var(--ok-bd); color:var(--ok-fg);
-      padding:10px 14px; border-radius:12px; font-size:14px; display:none;
+      position:fixed;
+      inset:auto 16px 16px 16px;
+      background:var(--ok-bg);
+      border:1px solid var(--ok-bd);
+      color:var(--ok-fg);
+      padding:10px 14px;
+      border-radius:12px;
+      font-size:14px;
+      display:none;
       box-shadow:0 8px 24px rgba(0,0,0,.08);
     }
     .toast.show { display:block; animation:fadein .18s ease; }
 
-    @keyframes fadein { from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+    @keyframes fadein {
+      from { opacity:0; transform:translateY(8px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
   </style>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -84,22 +143,26 @@
 
     <form id="orderForm" class="card mt" autocomplete="on">
       <h2>訂購資料</h2>
+
       <div class="grid">
         <div>
           <label>客戶/店家名稱
             <input name="customerName" required placeholder="阿綸熱炒/小郭飲料店">
           </label>
         </div>
+
         <div>
           <label>外送地址
             <input name="address" required placeholder="新北市三重區○○路 1 號">
           </label>
         </div>
+
         <div>
           <label>電話/手機
             <input name="phone" required inputmode="tel" placeholder="0912-345-678">
           </label>
         </div>
+
         <div>
           <label>預定日期
             <input type="date" name="orderDate" required>
@@ -126,7 +189,7 @@
 
         <div>
           <label>備註
-            <textarea name="note" rows="3" placeholder="（幾點有人在? 請告知，或其它提醒示項）"></textarea>
+            <textarea name="note" rows="3" placeholder="（幾點有人在? 請告知，或其它提醒事項）"></textarea>
           </label>
         </div>
       </div>
@@ -137,8 +200,10 @@
       <input type="hidden" name="slot">
 
       <div class="row mt" style="display:flex; align-items:center; gap:10px;">
-        <input id="submitBtn" type="submit" value="送出" class="btn btn-primary" style="min-width:140px">
-        <input id="resetBtn" type="reset" value="清空" class="btn">
+        <!-- 改成 button, 不用 input -->
+        <button id="submitBtn" type="submit"
+                class="btn btn-primary" style="min-width:140px;">送出</button>
+        <button id="resetBtn" type="reset" class="btn">清空</button>
         <span id="submitMsg" class="muted"></span>
       </div>
     </form>
@@ -147,8 +212,8 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
-    const LIFF_ID = "2008199393-AMqeEVBY";   // 正式 LIFF_ID
-    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbz81CJcKY9WsjzTBJBw1v_tVpjiiCc_EfNZr_QUaPsQ7DfTqlG8llSVC08o8mu8kvpM/exec"; // 正式後端
+    const LIFF_ID = "2008199393-AMqeEVBY";   // 正式 LIFF ID
+    const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbz81CJcKY9WsjzTBJBw1v_tVpjiiCc_EfNZr_QUaPsQ7DfTqlG8llSVC08o8mu8kvpM/exec";
 
     const AM = { key:"AM", start:"08:00", end:"12:00" };
     const PM = { key:"PM", start:"15:00", end:"17:00" };
@@ -156,7 +221,7 @@
     const $ = (s) => document.querySelector(s);
     const byName = (n) => document.querySelector(`[name="${n}"]`);
 
-    // ===== 共用日期 / 時間工具 =====
+    // 工具：日期轉 YYYY-MM-DD
     function toISODate(d) {
       const y = d.getFullYear();
       const m = String(d.getMonth()+1).padStart(2, "0");
@@ -170,6 +235,7 @@
       return x;
     }
 
+    // 取得現在時間（以分鐘表示）
     function getNowMin() {
       const now = new Date();
       return now.getHours()*60 + now.getMinutes();
@@ -179,44 +245,58 @@
     const MIN_12_59 = 12*60 + 59;
     const MIN_13_00 = 13*60;
 
-    // 依目前時間 + 選擇的日期，回傳允許的時段
+    // 根據「現在時間 + 所選日期」決定可預約時段
     function policyFor(dateStr) {
       const nowMin = getNowMin();
       const TODAY = toISODate(new Date());
       const d = dateStr ? new Date(dateStr + "T00:00:00") : null;
       const isToday = d && toISODate(d) === TODAY;
 
-      // 13:00 之後，今天不能下單
-      if (nowMin >= MIN_13_00) {
-        if (isToday) return { allowAM:false, allowPM:false, allowToday:false, note:"現在時間超過 13:00，今天不可預約" };
-        return { allowAM:true, allowPM:true, allowToday:true, note:"明天起皆可預約" };
+      // 今天
+      if (isToday) {
+        if (nowMin >= MIN_13_00) {
+          // 超過 13:00，今天不能預約
+          return {
+            allowAM:false, allowPM:false, allowToday:false,
+            note:"現在時間超過 13:00，今天不可預約"
+          };
+        }
+        if (nowMin >= MIN_07_00 && nowMin <= MIN_12_59) {
+          // 7:00–12:59：只能預約下午
+          return {
+            allowAM:false, allowPM:true, allowToday:true,
+            note:"今天僅可預約下午（15:00–17:00）"
+          };
+        }
+        // 凌晨～早上 7 點以前：上午與下午都可
+        return {
+          allowAM:true, allowPM:true, allowToday:true,
+          note:"現在是凌晨／早上，今天可預約上午或下午"
+        };
       }
 
-      // 07:00–12:59 → 今天只能預約下午
-      if (nowMin >= MIN_07_00 && nowMin <= MIN_12_59) {
-        if (isToday) return { allowAM:false, allowPM:true, allowToday:true, note:"今天僅可預約下午（15:00–17:00）" };
-        return { allowAM:true, allowPM:true, allowToday:true, note:"明天起皆可預約" };
-      }
-
-      // 凌晨～早上 → 今天上午/下午都可以
-      if (isToday) return { allowAM:true, allowPM:true, allowToday:true, note:"現在是凌晨／早上，今天可預約上午或下午" };
-      return { allowAM:true, allowPM:true, allowToday:true, note:"明天起皆可預約" };
+      // 未來日期：不管現在幾點，上午下午都可
+      return {
+        allowAM:true, allowPM:true, allowToday:true,
+        note:"可預約上午或下午"
+      };
     }
 
-    // 設定日期可選最小值（今天 or 明天）
+    // 控制「最小日期」
     function enforceMinDate(){
       const nowMin = getNowMin();
       const today = toISODate(new Date());
       const tomorrow = toISODate(addDays(new Date(),1));
       const minDate = (nowMin >= MIN_13_00) ? tomorrow : today;
+
       const orderDateEl = byName("orderDate");
       orderDateEl.min = minDate;
+
       if (!orderDateEl.value || orderDateEl.value < minDate) {
         orderDateEl.value = minDate;
       }
     }
 
-    // ===== 時段按鈕處理 =====
     const optAM = $("#optAM"), optPM = $("#optPM");
 
     function setDisabled(el, disabled) {
@@ -226,13 +306,20 @@
     }
 
     function setSlot(slot){
-      const st = byName("startTime"), et = byName("endTime"), sl = byName("slot");
+      const st = byName("startTime"),
+            et = byName("endTime"),
+            sl = byName("slot");
+
       if (slot === AM.key) {
-        st.value = AM.start; et.value = AM.end; sl.value = AM.key;
+        st.value = AM.start;
+        et.value = AM.end;
+        sl.value = AM.key;
         optAM.setAttribute("aria-pressed","true");
         optPM.setAttribute("aria-pressed","false");
       } else if (slot === PM.key) {
-        st.value = PM.start; et.value = PM.end; sl.value = PM.key;
+        st.value = PM.start;
+        et.value = PM.end;
+        sl.value = PM.key;
         optAM.setAttribute("aria-pressed","false");
         optPM.setAttribute("aria-pressed","true");
       } else {
@@ -242,43 +329,46 @@
       }
     }
 
-    // ⭐ 修正版：只在「沒選」或「原本選擇已無效」時才自動幫選時段
+    // 依日期刷新可選時段（保留目前合法選擇）
     function refreshSlotLimit(){
       const orderDateEl = byName("orderDate");
       const dateHelp = $("#dateHelp");
       const val = orderDateEl.value;
       const pol = policyFor(val);
+
       dateHelp.textContent = pol.note;
 
-      // 使用者目前選的 slot 值
-      const currentSlot = byName("slot").value;
-
-      // 先依 policy 禁用 / 啟用按鈕
       setDisabled(optAM, !pol.allowAM);
       setDisabled(optPM, !pol.allowPM);
 
-      // 如果原本選擇還合法，就保留原本的；不去動它
-      if (currentSlot === AM.key && pol.allowAM) {
-        setSlot(AM.key);
-      } else if (currentSlot === PM.key && pol.allowPM) {
-        setSlot(PM.key);
-      } else {
-        // 原本選項已經不合法（或還沒選）才幫忙選預設
-        if (pol.allowAM) {
-          setSlot(AM.key);
-        } else if (pol.allowPM) {
-          setSlot(PM.key);
-        } else {
-          setSlot(null);
-        }
+      const currentSlot = byName("slot").value;
+
+      // 如果目前選擇的時段已經不合法，就清空
+      if (currentSlot === AM.key && !pol.allowAM) {
+        setSlot(null);
+      } else if (currentSlot === PM.key && !pol.allowPM) {
+        setSlot(null);
       }
 
+      // 若尚未選擇任何時段，幫忙選一個可用的預設值
+      if (!byName("slot").value) {
+        if (pol.allowAM)      setSlot(AM.key);
+        else if (pol.allowPM) setSlot(PM.key);
+        else                  setSlot(null);
+      }
+
+      // 若今天完全不能訂單，自動跳到明天
       const today = toISODate(new Date());
       if (!pol.allowToday && val === today) {
         orderDateEl.value = toISODate(addDays(new Date(),1));
-        // 再刷新一次，套用新的日期規則
-        refreshSlotLimit();
+        refreshSlotLimit(); // 再跑一次，用明天的規則
       }
+    }
+
+    // 統一做一次 minDate + slot 判斷
+    function refreshAll() {
+      enforceMinDate();
+      refreshSlotLimit();
     }
 
     // 點 AM/PM 按鈕
@@ -293,7 +383,7 @@
       $("#slotErr").style.display = "none";
     });
 
-    // ===== LIFF & 預設資料 =====
+    // ===== LIFF + 預設資料 =====
     async function initLiff(){
       try {
         await liff.init({ liffId: LIFF_ID });
@@ -302,11 +392,15 @@
           return;
         }
         window.LIFF_READY = true;
+
+        // 讀 profile -> 用 userId 存預設資料
         try {
           const p = await liff.getProfile();
           window.__USER_ID__ = p.userId || "";
           if (window.__USER_ID__) loadDefaults(window.__USER_ID__);
-        } catch {}
+        } catch (e) {
+          console.warn("getProfile 失敗，但不影響送單", e);
+        }
       } catch(e) {
         console.error("liff.init 失敗", e);
       }
@@ -317,12 +411,13 @@
 
     function loadDefaults(uid){
       try{
-        const raw = localStorage.getItem(keyFor(uid)); if (!raw) return;
+        const raw = localStorage.getItem(keyFor(uid));
+        if (!raw) return;
         const d = JSON.parse(raw);
         if (d.customerName && !byName("customerName").value) byName("customerName").value = d.customerName;
-        if (d.address && !byName("address").value) byName("address").value = d.address;
-        if (d.phone && !byName("phone").value) byName("phone").value = d.phone;
-        if (d.note && !byName("note").value) byName("note").value = d.note;
+        if (d.address      && !byName("address").value)      byName("address").value      = d.address;
+        if (d.phone        && !byName("phone").value)        byName("phone").value        = d.phone;
+        if (d.note         && !byName("note").value)         byName("note").value         = d.note;
       } catch {}
     }
 
@@ -330,14 +425,15 @@
       try{
         const data = {
           customerName: byName("customerName").value.trim(),
-          address: byName("address").value.trim(),
-          phone: byName("phone").value.trim(),
-          note: byName("note").value.trim(),
+          address:      byName("address").value.trim(),
+          phone:        byName("phone").value.trim(),
+          note:         byName("note").value.trim(),
         };
         localStorage.setItem(keyFor(uid), JSON.stringify(data));
       } catch {}
     }
 
+    // Shift+點「清空」= 清掉記住的預設資料
     $("#resetBtn").addEventListener("click", (ev)=>{
       if (ev.shiftKey && window.__USER_ID__) {
         localStorage.removeItem(keyFor(window.__USER_ID__));
@@ -345,13 +441,7 @@
       }
     });
 
-    // ===== 一起刷新日期 + 時段 =====
-    function refreshAll() {
-      enforceMinDate();
-      refreshSlotLimit();
-    }
-
-    // ===== 送出表單 =====
+    // ===== 送單流程 =====
     $("#orderForm").addEventListener("submit", async (e)=>{
       e.preventDefault();
       const btn = $("#submitBtn"), msg = $("#submitMsg");
@@ -359,7 +449,7 @@
       msg.textContent = "送出中…";
       btn.disabled = true;
 
-      refreshAll();
+      refreshAll();  // 再確認一次日期 / 時段規則
 
       if (!byName("slot").value) {
         $("#slotErr").style.display = "block";
@@ -395,11 +485,13 @@
         const fd = new FormData(e.target);
         const p = new URLSearchParams();
         p.set("id_token", idToken);
+
         ["customerName","address","phone","orderDate","startTime","endTime","qty","note","slot"]
           .forEach(k => p.set(k, (fd.get(k)||"").toString().trim()));
 
         const controller = new AbortController();
         const timer = setTimeout(()=>controller.abort(), 15000);
+
         const res = await fetch(GAS_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
@@ -416,6 +508,7 @@
 
         msg.className = "muted";
         msg.textContent = "";
+
         const toast = $("#toast");
         toast.textContent = `已送出 ✅ 訂單編號：${json.orderId}`;
         toast.classList.add("show");
@@ -432,19 +525,12 @@
       }
     });
 
-    // 啟動（load 時執行一次）
+    // 頁面載入：先 init LIFF，再設定日期 & 時段
     window.addEventListener("load", async () => {
       await initLiff();
       refreshAll();
-
-      // ⭐ 日期變更時，重新計算可選時段
-      const orderDateEl = byName("orderDate");
-      if (orderDateEl) {
-        orderDateEl.addEventListener("change", () => {
-          refreshSlotLimit();
-        });
-      }
     });
   </script>
 </body>
 </html>
+
