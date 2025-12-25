@@ -12,34 +12,17 @@
       --primary-contrast:#fff;
       --ok-bg:#d1fae5; --ok-bd:#10b981; --ok-fg:#065f46;
     }
-    body {
-      font-family: system-ui, -apple-system, "Noto Sans TC", Arial;
-      margin:0;
-      background:#fff;
-    }
+    body { font-family: system-ui, -apple-system, "Noto Sans TC", Arial; margin:0; background:#fff; }
     .wrap { max-width:960px; margin:0 auto; padding:24px; }
     h1 { font-size:28px; margin:0 0 16px; }
     h2 { font-size:20px; margin:0 0 12px; }
 
-    .card {
-      border:1px solid var(--bd);
-      border-radius:14px;
-      padding:16px;
-      background:#fff;
-    }
-    .grid {
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:14px;
-    }
+    .card { border:1px solid var(--bd); border-radius:14px; padding:16px; background:#fff; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
     label { display:block; font-size:14px; color:#111827; }
     input, textarea {
-      width:100%;
-      box-sizing:border-box;
-      padding:10px 12px;
-      border:1px solid var(--bd);
-      border-radius:10px;
-      background:#fff;
+      width:100%; box-sizing:border-box; padding:10px 12px;
+      border:1px solid var(--bd); border-radius:10px; background:#fff;
     }
     textarea { resize:vertical; }
 
@@ -59,15 +42,10 @@
     }
 
     .btn {
-      color:#111827;
-      background:#fff;
-      border:1px solid var(--bd);
-      font-size:16px;
-      line-height:1.2;
-      border-radius:10px;
-      padding:10px 14px;
-      -webkit-appearance:none;
-      appearance:none;
+      color:#111827; background:#fff; border:1px solid var(--bd);
+      font-size:16px; line-height:1.2;
+      border-radius:10px; padding:10px 14px;
+      -webkit-appearance:none; appearance:none;
       cursor:pointer;
       transition: transform .02s ease, box-shadow .2s ease;
     }
@@ -79,18 +57,9 @@
       box-shadow:0 6px 18px rgba(17,24,39,.15);
       font-weight:600;
     }
-    .btn-primary:disabled {
-      opacity:.6;
-      cursor:not-allowed;
-      box-shadow:none;
-    }
+    .btn-primary:disabled { opacity:.6; cursor:not-allowed; box-shadow:none; }
 
-    .seg {
-      display:flex;
-      gap:10px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
+    .seg { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .seg .opt {
       border:2px solid var(--bd);
       border-radius:12px;
@@ -104,10 +73,7 @@
       box-shadow:0 0 0 3px rgba(17,24,39,.12);
       font-weight:600;
     }
-    .seg .opt[aria-disabled="true"] {
-      opacity:.45;
-      cursor:not-allowed;
-    }
+    .seg .opt[aria-disabled="true"] { opacity:.45; cursor:not-allowed; }
 
     .toast {
       position:fixed;
@@ -122,7 +88,6 @@
       box-shadow:0 8px 24px rgba(0,0,0,.08);
     }
     .toast.show { display:block; animation:fadein .18s ease; }
-
     @keyframes fadein {
       from { opacity:0; transform:translateY(8px); }
       to   { opacity:1; transform:translateY(0); }
@@ -131,6 +96,7 @@
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
+
 <body>
   <div class="wrap">
     <div class="notice">
@@ -222,45 +188,32 @@
       const da = String(d.getDate()).padStart(2, "0");
       return `${y}-${m}-${da}`;
     }
+    function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+    function getNowMin() { const now = new Date(); return now.getHours()*60 + now.getMinutes(); }
 
-    function addDays(d, n) {
-      const x = new Date(d);
-      x.setDate(x.getDate() + n);
-      return x;
-    }
-
-    function getNowMin() {
-      const now = new Date();
-      return now.getHours()*60 + now.getMinutes();
+    // YYYY-MM-DD 的字串可直接做大小比較（格式固定）
+    function isFutureDate(dateStr) {
+      const today = toISODate(new Date());
+      return (dateStr && dateStr > today);
     }
 
     const MIN_07_00 = 7*60;
     const MIN_12_59 = 12*60 + 59;
     const MIN_13_00 = 13*60;
 
-    function policyFor(dateStr) {
+    // 只處理「今天」的規則，未來日期由 refreshSlotLimit 直接放行
+    function policyForToday() {
       const nowMin = getNowMin();
-      const TODAY = toISODate(new Date());
-      const d = dateStr ? new Date(dateStr + "T00:00:00") : null;
-      const isToday = d && toISODate(d) === TODAY;
-
-      if (isToday) {
-        if (nowMin >= MIN_13_00) {
-          return { allowAM:false, allowPM:false, allowToday:false,
-                   note:"現在時間超過 13:00，今天不可預約" };
-        }
-        if (nowMin >= MIN_07_00 && nowMin <= MIN_12_59) {
-          return { allowAM:false, allowPM:true, allowToday:true,
-                   note:"今天僅可預約下午（15:00–17:00）" };
-        }
-        return { allowAM:true, allowPM:true, allowToday:true,
-                 note:"現在是凌晨／早上，今天可預約上午或下午" };
+      if (nowMin >= MIN_13_00) {
+        return { allowAM:false, allowPM:false, allowToday:false, note:"現在時間超過 13:00，今天不可預約" };
       }
-
-      return { allowAM:true, allowPM:true, allowToday:true,
-               note:"可預約上午或下午" };
+      if (nowMin >= MIN_07_00 && nowMin <= MIN_12_59) {
+        return { allowAM:false, allowPM:true, allowToday:true, note:"今天僅可預約下午（15:00–17:00）" };
+      }
+      return { allowAM:true, allowPM:true, allowToday:true, note:"現在是凌晨／早上，今天可預約上午或下午" };
     }
 
+    // ✅ 最小日期：>=13:00 才推到明天（否則 07:00–12:59 會不能選今天下午）
     function enforceMinDate(){
       const nowMin = getNowMin();
       const today = toISODate(new Date());
@@ -289,15 +242,11 @@
             sl = byName("slot");
 
       if (slot === AM.key) {
-        st.value = AM.start;
-        et.value = AM.end;
-        sl.value = AM.key;
+        st.value = AM.start; et.value = AM.end; sl.value = AM.key;
         optAM.setAttribute("aria-pressed","true");
         optPM.setAttribute("aria-pressed","false");
       } else if (slot === PM.key) {
-        st.value = PM.start;
-        et.value = PM.end;
-        sl.value = PM.key;
+        st.value = PM.start; et.value = PM.end; sl.value = PM.key;
         optAM.setAttribute("aria-pressed","false");
         optPM.setAttribute("aria-pressed","true");
       } else {
@@ -309,10 +258,23 @@
 
     function refreshSlotLimit(){
       const orderDateEl = byName("orderDate");
-      const dateHelp = $("#dateHelp");
       const val = orderDateEl.value;
-      const pol = policyFor(val);
+      const dateHelp = $("#dateHelp");
+      const today = toISODate(new Date());
 
+      // ✅ 方法二（強化）：只要是未來日期（明天/大後天/…）一律放行 AM/PM
+      if (isFutureDate(val)) {
+        setDisabled(optAM, false);
+        setDisabled(optPM, false);
+        dateHelp.textContent = "未來日期可預約上午或下午";
+
+        // 保留原本選擇；若沒有選擇，預設 AM
+        if (!byName("slot").value) setSlot(AM.key);
+        return;
+      }
+
+      // ===== 今天：套用限制 =====
+      const pol = policyForToday();
       dateHelp.textContent = pol.note;
 
       setDisabled(optAM, !pol.allowAM);
@@ -320,19 +282,16 @@
 
       const currentSlot = byName("slot").value;
 
-      if (currentSlot === AM.key && !pol.allowAM) {
-        setSlot(null);
-      } else if (currentSlot === PM.key && !pol.allowPM) {
-        setSlot(null);
-      }
+      if (currentSlot === AM.key && !pol.allowAM) setSlot(null);
+      if (currentSlot === PM.key && !pol.allowPM) setSlot(null);
 
       if (!byName("slot").value) {
-        if (pol.allowAM)      setSlot(AM.key);
+        if (pol.allowAM) setSlot(AM.key);
         else if (pol.allowPM) setSlot(PM.key);
-        else                  setSlot(null);
+        else setSlot(null);
       }
 
-      const today = toISODate(new Date());
+      // 今天完全不能訂（>=13:00）→ 推到明天
       if (!pol.allowToday && val === today) {
         orderDateEl.value = toISODate(addDays(new Date(),1));
         refreshSlotLimit();
@@ -344,11 +303,39 @@
       refreshSlotLimit();
     }
 
-    // ✅ 新增：日期變更時，立刻重算（解決選到明天但上午仍被鎖住）
+    // ✅ 日期欄位事件加強（iOS/LINE WebView 常有 input/change 不穩）:contentReference[oaicite:2]{index=2}
     const orderDateEl = byName("orderDate");
-    orderDateEl.addEventListener("input", refreshAll);
-    orderDateEl.addEventListener("change", refreshAll);
+    const dateWatch = { timer:null, last: "" };
 
+    function kickDateRefresh() {
+      // 小心：有些環境 value 更新延後，所以用 setTimeout 再補一槍
+      refreshAll();
+      setTimeout(refreshAll, 0);
+    }
+
+    function startDatePolling() {
+      dateWatch.last = orderDateEl.value || "";
+      if (dateWatch.timer) return;
+      dateWatch.timer = setInterval(() => {
+        const v = orderDateEl.value || "";
+        if (v !== dateWatch.last) {
+          dateWatch.last = v;
+          kickDateRefresh();
+        }
+      }, 200);
+    }
+    function stopDatePolling() {
+      if (dateWatch.timer) clearInterval(dateWatch.timer);
+      dateWatch.timer = null;
+    }
+
+    ["input","change","blur","focusout","click","touchend"].forEach(evt => {
+      orderDateEl.addEventListener(evt, kickDateRefresh, { passive:true });
+    });
+    orderDateEl.addEventListener("focus", startDatePolling);
+    orderDateEl.addEventListener("blur", stopDatePolling);
+
+    // 點 AM/PM
     optAM.addEventListener("click", ()=>{
       if (optAM.getAttribute("aria-disabled")==="true") return;
       setSlot(AM.key);
@@ -360,6 +347,7 @@
       $("#slotErr").style.display = "none";
     });
 
+    // ===== LIFF + 預設資料 =====
     async function initLiff(){
       try {
         await liff.init({ liffId: LIFF_ID });
@@ -408,6 +396,7 @@
       } catch {}
     }
 
+    // Shift+點清空：清掉記住資料
     $("#resetBtn").addEventListener("click", (ev)=>{
       if (ev.shiftKey && window.__USER_ID__) {
         localStorage.removeItem(keyFor(window.__USER_ID__));
@@ -415,11 +404,12 @@
       }
     });
 
-    // ✅ 新增：reset 後也重算（確保日期/時段恢復正確）
+    // reset 後重算
     $("#orderForm").addEventListener("reset", ()=>{
       setTimeout(refreshAll, 0);
     });
 
+    // ===== 送單 =====
     $("#orderForm").addEventListener("submit", async (e)=>{
       e.preventDefault();
       const btn = $("#submitBtn"), msg = $("#submitMsg");
