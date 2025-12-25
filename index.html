@@ -58,7 +58,6 @@
       margin:0 0 16px;
     }
 
-    /* ==== 按鈕：避免 LINE 文字消失 ==== */
     .btn {
       color:#111827;
       background:#fff;
@@ -170,7 +169,6 @@
           </label>
         </div>
 
-        <!-- AM/PM 選擇 -->
         <div>
           <label>選擇配送時段</label>
           <div class="seg" role="group" aria-label="配送時段">
@@ -194,7 +192,6 @@
         </div>
       </div>
 
-      <!-- 隱藏欄位送後端 -->
       <input type="hidden" name="startTime">
       <input type="hidden" name="endTime">
       <input type="hidden" name="slot">
@@ -210,7 +207,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
-    const LIFF_ID = "2008199393-AMqeEVBY";   // 正式 LIFF ID
+    const LIFF_ID = "2008199393-AMqeEVBY";
     const GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbz81CJcKY9WsjzTBJBw1v_tVpjiiCc_EfNZr_QUaPsQ7DfTqlG8llSVC08o8mu8kvpM/exec";
 
     const AM = { key:"AM", start:"08:00", end:"12:00" };
@@ -237,43 +234,42 @@
       return now.getHours()*60 + now.getMinutes();
     }
 
-    // ISO 日期字串可用 lexicographical 比較（YYYY-MM-DD）
-    function isAfter(aISO, bISO) {
-      return aISO && bISO && aISO.localeCompare(bISO) > 0;
-    }
-
     const MIN_07_00 = 7*60;
     const MIN_12_59 = 12*60 + 59;
     const MIN_13_00 = 13*60;
 
-    // ===== 規則：只有「今天」才需要依現在時間限制 AM/PM；未來日期一律可選 AM/PM =====
-    function policyForToday(nowMin) {
-      // 13:00 之後：今天完全不能訂
-      if (nowMin >= MIN_13_00) {
-        return { allowAM:false, allowPM:false, allowToday:false, note:"現在時間超過 13:00，今天不可預約" };
+    function policyFor(dateStr) {
+      const nowMin = getNowMin();
+      const TODAY = toISODate(new Date());
+      const d = dateStr ? new Date(dateStr + "T00:00:00") : null;
+      const isToday = d && toISODate(d) === TODAY;
+
+      if (isToday) {
+        if (nowMin >= MIN_13_00) {
+          return { allowAM:false, allowPM:false, allowToday:false,
+                   note:"現在時間超過 13:00，今天不可預約" };
+        }
+        if (nowMin >= MIN_07_00 && nowMin <= MIN_12_59) {
+          return { allowAM:false, allowPM:true, allowToday:true,
+                   note:"今天僅可預約下午（15:00–17:00）" };
+        }
+        return { allowAM:true, allowPM:true, allowToday:true,
+                 note:"現在是凌晨／早上，今天可預約上午或下午" };
       }
-      // 07:00–12:59：今天只能訂下午
-      if (nowMin >= MIN_07_00 && nowMin <= MIN_12_59) {
-        return { allowAM:false, allowPM:true, allowToday:true, note:"今天僅可預約下午（15:00–17:00）" };
-      }
-      // 00:00–06:59：今天上午/下午都可
-      return { allowAM:true, allowPM:true, allowToday:true, note:"現在是凌晨／早上，今天可預約上午或下午" };
+
+      return { allowAM:true, allowPM:true, allowToday:true,
+               note:"可預約上午或下午" };
     }
 
-    // 控制「最小日期」
     function enforceMinDate(){
       const nowMin = getNowMin();
       const today = toISODate(new Date());
       const tomorrow = toISODate(addDays(new Date(),1));
-
-      // ✅ 關鍵修正：只有 >=13:00 才把最小日期推到明天
-      // 這樣 07:00–12:59 才能選「今天」並下「當天下午」訂單
       const minDate = (nowMin >= MIN_13_00) ? tomorrow : today;
 
       const orderDateEl = byName("orderDate");
       orderDateEl.min = minDate;
 
-      // 若目前 value 空白或早於 min，才強制改成 minDate
       if (!orderDateEl.value || orderDateEl.value < minDate) {
         orderDateEl.value = minDate;
       }
@@ -293,11 +289,15 @@
             sl = byName("slot");
 
       if (slot === AM.key) {
-        st.value = AM.start; et.value = AM.end; sl.value = AM.key;
+        st.value = AM.start;
+        et.value = AM.end;
+        sl.value = AM.key;
         optAM.setAttribute("aria-pressed","true");
         optPM.setAttribute("aria-pressed","false");
       } else if (slot === PM.key) {
-        st.value = PM.start; et.value = PM.end; sl.value = PM.key;
+        st.value = PM.start;
+        et.value = PM.end;
+        sl.value = PM.key;
         optAM.setAttribute("aria-pressed","false");
         optPM.setAttribute("aria-pressed","true");
       } else {
@@ -307,28 +307,12 @@
       }
     }
 
-    // 依日期刷新可選時段（保留目前合法選擇）
     function refreshSlotLimit(){
       const orderDateEl = byName("orderDate");
       const dateHelp = $("#dateHelp");
       const val = orderDateEl.value;
+      const pol = policyFor(val);
 
-      const today = toISODate(new Date());
-      const nowMin = getNowMin();
-
-      // ===== 方法二（強化版）：只要是「未來日期」（隔天/大後天/大大後天…）一律放行 AM/PM =====
-      if (isAfter(val, today)) {
-        setDisabled(optAM, false);
-        setDisabled(optPM, false);
-        dateHelp.textContent = "未來日期可預約上午或下午";
-
-        // 若目前選擇空白，就預設 AM（你可改成 PM 或保留不選）
-        if (!byName("slot").value) setSlot(AM.key);
-        return;
-      }
-
-      // ===== 走到這裡代表「今天」 =====
-      const pol = policyForToday(nowMin);
       dateHelp.textContent = pol.note;
 
       setDisabled(optAM, !pol.allowAM);
@@ -336,21 +320,22 @@
 
       const currentSlot = byName("slot").value;
 
-      // 若目前選擇不合法 → 清空
-      if (currentSlot === AM.key && !pol.allowAM) setSlot(null);
-      if (currentSlot === PM.key && !pol.allowPM) setSlot(null);
+      if (currentSlot === AM.key && !pol.allowAM) {
+        setSlot(null);
+      } else if (currentSlot === PM.key && !pol.allowPM) {
+        setSlot(null);
+      }
 
-      // 若尚未選擇 → 自動選可用的
       if (!byName("slot").value) {
         if (pol.allowAM)      setSlot(AM.key);
         else if (pol.allowPM) setSlot(PM.key);
         else                  setSlot(null);
       }
 
-      // 若今天完全不能訂（>=13:00），把日期推到明天
+      const today = toISODate(new Date());
       if (!pol.allowToday && val === today) {
         orderDateEl.value = toISODate(addDays(new Date(),1));
-        refreshSlotLimit(); // 用明天（未來日期）規則再跑一次
+        refreshSlotLimit();
       }
     }
 
@@ -359,7 +344,11 @@
       refreshSlotLimit();
     }
 
-    // 點 AM/PM
+    // ✅ 新增：日期變更時，立刻重算（解決選到明天但上午仍被鎖住）
+    const orderDateEl = byName("orderDate");
+    orderDateEl.addEventListener("input", refreshAll);
+    orderDateEl.addEventListener("change", refreshAll);
+
     optAM.addEventListener("click", ()=>{
       if (optAM.getAttribute("aria-disabled")==="true") return;
       setSlot(AM.key);
@@ -371,7 +360,6 @@
       $("#slotErr").style.display = "none";
     });
 
-    // ===== LIFF + 預設資料 =====
     async function initLiff(){
       try {
         await liff.init({ liffId: LIFF_ID });
@@ -420,7 +408,6 @@
       } catch {}
     }
 
-    // Shift+點「清空」= 清掉記住的預設資料
     $("#resetBtn").addEventListener("click", (ev)=>{
       if (ev.shiftKey && window.__USER_ID__) {
         localStorage.removeItem(keyFor(window.__USER_ID__));
@@ -428,7 +415,11 @@
       }
     });
 
-    // ===== 送單 =====
+    // ✅ 新增：reset 後也重算（確保日期/時段恢復正確）
+    $("#orderForm").addEventListener("reset", ()=>{
+      setTimeout(refreshAll, 0);
+    });
+
     $("#orderForm").addEventListener("submit", async (e)=>{
       e.preventDefault();
       const btn = $("#submitBtn"), msg = $("#submitMsg");
